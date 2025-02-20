@@ -1,0 +1,279 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ newsletter.name }} - Newsletter Details{% endblock %}
+
+{% block content %}
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+
+    .header {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #DEE2E6;
+        text-align: center;
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 30px;
+    }
+
+    .newsletter-info {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #DEE2E6;
+        margin-bottom: 20px;
+    }
+
+    .template-section {
+        margin-bottom: 20px;
+    }
+
+    .campaign-inputs {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #DEE2E6;
+        margin-bottom: 20px;
+    }
+
+    .preview-section {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #DEE2E6;
+    }
+
+    .preview-frame {
+        width: 100%;
+        height: 900px;
+        border: 1px solid #DEE2E6;
+        border-radius: 5px;
+    }
+
+    .placeholder-counter {
+        font-size: 14px;
+        color: #666;
+        margin: 10px 0;
+    }
+
+    .campaign-input-item {
+        margin-bottom: 15px;
+        padding: 10px;
+        border: 1px solid #eee;
+        border-radius: 5px;
+    }
+</style>
+
+<div class="container mt-4">
+    <!-- Header -->
+    <div class="header">{{ newsletter.name }}</div>
+
+    <!-- Newsletter Information -->
+    <div class="newsletter-info">
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Newsletter ID:</strong> {{ newsletter.newsletter_id }}</p>
+                <p><strong>Created Date:</strong> {{ newsletter.created_at|date:"F d, Y" }}</p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Total Campaigns:</strong> <span id="totalCampaigns">0</span></p>
+                <p><strong>Status:</strong> <span id="templateStatus">No template uploaded</span></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template Upload Section -->
+    <div class="template-section">
+        <form id="templateUploadForm" class="mb-3">
+            {% csrf_token %}
+            <div class="mb-3">
+                <input type="file" class="form-control" id="templateFile" accept=".html" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Upload Template</button>
+        </form>
+        <div id="placeholderCounter" class="placeholder-counter"></div>
+    </div>
+
+    <!-- Campaign ID Inputs -->
+    <div id="campaignInputsSection" class="campaign-inputs" style="display: none;">
+        <div id="campaignInputs"></div>
+    </div>
+
+    <!-- Preview Section -->
+    <div id="previewSection" class="preview-section" style="display: none;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5>Preview</h5>
+            <button id="previewButton" class="btn btn-primary" disabled>Generate Preview</button>
+        </div>
+        <div id="previewContainer">
+            <iframe id="previewFrame" class="preview-frame"></iframe>
+        </div>
+    </div>
+</div>
+
+<script>
+    let templateContent = '';
+    let detectedPlaceholders = [];
+    let campaignIds = [];
+
+    document.getElementById('templateUploadForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const formData = new FormData();
+        const file = document.getElementById('templateFile').files[0];
+
+        if (!file) return;
+
+        const uploadButton = e.target.querySelector('button');
+        uploadButton.disabled = true;
+        uploadButton.textContent = "Uploading...";
+
+        formData.append('template', file);
+
+        try {
+            const response = await fetch('/api/process-template/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': getCookie('csrftoken') },
+                body: formData
+            });
+
+            const data = await response.json();
+            if (data.status === 'success') {
+                templateContent = data.template_content;
+                detectedPlaceholders = findCampaignPlaceholders(templateContent);
+                displayCampaignInputs();
+                updateTemplateStatus();
+            } else {
+                alert("Failed to process template.");
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert("An error occurred while uploading.");
+        } finally {
+            uploadButton.disabled = false;
+            uploadButton.textContent = "Upload Template";
+        }
+    });
+
+    function findCampaignPlaceholders(content) {
+        const regex = /\{\{campaign_id_(\d+)\}\}/g;
+        const matches = content.matchAll(regex);
+        const placeholders = [];
+
+        for (const match of matches) {
+            placeholders.push(match[0]);
+        }
+
+        return [...new Set(placeholders)];
+    }
+
+    function displayCampaignInputs() {
+        const container = document.getElementById('campaignInputs');
+        container.innerHTML = '';
+        campaignIds = Array(detectedPlaceholders.length).fill('');
+
+        detectedPlaceholders.forEach((placeholderId, index) => {
+            const inputGroup = document.createElement('div');
+            inputGroup.className = 'campaign-input-item';
+            inputGroup.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="form-label mb-0">Campaign ${index + 1}</label>
+                <span class="badge bg-light text-dark">ID: ${placeholderId}</span>
+            </div>
+            <input type="text" class="form-control campaign-id-input" 
+                   data-placeholder="${placeholderId}" 
+                   placeholder="Enter Campaign ID">
+        `;
+            container.appendChild(inputGroup);
+        });
+
+        document.getElementById('campaignInputsSection').style.display = 'block';
+        document.getElementById('previewSection').style.display = 'block';
+        updatePlaceholderCounter();
+        updateTotalCampaigns();
+
+        document.querySelectorAll('.campaign-id-input').forEach(input => {
+            input.addEventListener('input', function () {
+                const index = [...document.querySelectorAll('.campaign-id-input')].indexOf(this);
+                campaignIds[index] = this.value.trim();
+                updatePlaceholderCounter();
+                checkAndTriggerPreview();
+            });
+        });
+    }
+
+    function updateTemplateStatus() {
+        const status = document.getElementById('templateStatus');
+        status.textContent = templateContent ? 'Template uploaded' : 'No template uploaded';
+    }
+
+    function updateTotalCampaigns() {
+        const total = document.getElementById('totalCampaigns');
+        total.textContent = detectedPlaceholders.length;
+    }
+
+    function updatePlaceholderCounter() {
+        const counter = document.getElementById('placeholderCounter');
+        const filledCount = campaignIds.filter(id => id.trim() !== '').length;
+        counter.textContent = `Campaign IDs filled: ${filledCount}/${detectedPlaceholders.length}`;
+    }
+
+    function updatePreviewButton() {
+        const previewButton = document.getElementById('previewButton');
+        const isComplete = campaignIds.every(id => id.trim() !== '');
+        previewButton.disabled = !isComplete;
+    }
+
+    async function checkAndTriggerPreview() {
+        if (campaignIds.every(id => id.trim() !== '')) {
+            await generatePreview();
+        }
+    }
+
+    async function generatePreview() {
+        document.getElementById('previewButton').disabled = true;
+        document.getElementById('previewButton').textContent = "Preview...";
+
+        try {
+            const response = await fetch('/api/generate-preview/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                body: JSON.stringify({
+                    template_content: templateContent,
+                    campaign_ids: campaignIds,
+                    newsletter_id: '{{ newsletter.newsletter_id }}'
+                })
+            });
+
+            if (!response.ok) throw new Error('Preview generation failed');
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            document.getElementById('previewFrame').src = url;
+        } catch (error) {
+            console.error('Error:', error);
+            alert("Failed to generate preview.");
+        } finally {
+            document.getElementById('previewButton').disabled = false;
+        }
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,181 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Newsletters - Brand Management{% endblock %}
+
+{% block content %}
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+
+    .header {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #DEE2E6;
+        text-align: center;
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 30px;
+    }
+
+    .table-header {
+        background: white;
+    }
+
+    .btn-create {
+        background: white;
+        padding: 10px 20px;
+        border-radius: 10px;
+        border: 1px solid #DEE2E6;
+        text-decoration: none;
+    }
+
+    .btn-view {
+        text-decoration: none;
+        color: #336699;
+    }
+
+    #newsletterCount {
+        font-size: 14px;
+        color: #212529;
+        padding: 5px 10px;
+        border-radius: 5px;
+        margin-left: 10px;
+    }
+</style>
+
+<div class="container mt-4">
+    <div class="header">Newsletters</div>
+
+    <!-- Search & Filter -->
+    <div class="table-container">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="search-container d-flex gap-2">
+                <input type="text" id="searchNewsletter" placeholder="Search..." class="form-control">
+                <input type="date" id="filterStartDate" class="form-control">
+                <input type="date" id="filterEndDate" class="form-control">
+                <button id="filterBtn" class="btn btn-primary">Filter</button>
+            </div>
+            <div class="d-flex align-items-center">
+                <button class="btn-create" data-bs-toggle="modal" data-bs-target="#createNewsletterModal">Create Newsletter</button>
+                <span id="newsletterCount" class="badge">{{ newsletters|length|default:0 }} Newsletters</span>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <table class="table table-bordered">
+            <thead class="table-header">
+                <tr>
+                    <th>S.No.</th>
+                    <th>Newsletter Name</th>
+                    <th>Newsletter ID</th>
+                    <th>Created Date</th>
+                    <th>Campaign IDs</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="newsletterTableBody">
+                {% for newsletter in newsletters %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ newsletter.name }}</td>
+                    <td>{{ newsletter.newsletter_id }}</td>
+                    <td>{{ newsletter.created_at }}</td>
+                    <td>
+                        {% if newsletter.get_placeholders %}
+                        {{ newsletter.get_placeholders|join:", " }}
+                        {% else %}
+                        N/A
+                        {% endif %}
+                    </td>
+                    <td><a href="/newsletter/{{ newsletter.newsletter_id }}/" class="btn-view">View &nearr;</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Simplified Create Newsletter Modal -->
+<div class="modal fade" id="createNewsletterModal" tabindex="-1" aria-labelledby="createNewsletterModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-0">
+            <div class="modal-header">
+                <h5 class="modal-title">Create Newsletter</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createNewsletterForm" method="POST">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="newsletterName" class="form-label">Newsletter Name</label>
+                        <input type="text" class="form-control" id="newsletterName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newsletterID" class="form-label">Newsletter ID</label>
+                        <input type="text" class="form-control" id="newsletterID" readonly>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create Newsletter</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function generateNewsletterID() {
+        let timestamp = new Date().getTime();
+        let newsletterID = "NL" + timestamp.toString().slice(-6);
+        document.getElementById("newsletterID").value = newsletterID;
+    }
+
+    document.getElementById('createNewsletterModal').addEventListener('show.bs.modal', function (e) {
+        generateNewsletterID();
+    });
+
+    document.getElementById('createNewsletterForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        const newsletterData = {
+            name: document.getElementById('newsletterName').value,
+            newsletter_id: document.getElementById('newsletterID').value
+        };
+
+        try {
+            const response = await fetch('/api/create-newsletter/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify(newsletterData)
+            });
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                location.reload();
+            }
+        } catch (error) {
+            console.error('Error creating newsletter:', error);
+        }
+    });
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
+
+{% endblock %}

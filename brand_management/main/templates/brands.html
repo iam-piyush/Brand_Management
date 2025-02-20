@@ -1,0 +1,253 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Brands - Brand Management{% endblock %}
+
+{% block content %}
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+
+    .header {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #DEE2E6;
+        text-align: center;
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 30px;
+    }
+
+    .table-header {
+        background: white;
+    }
+
+    .search-container {
+        display: flex;
+        gap: 10px;
+    }
+
+    .search-container input,
+    .search-container button {
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px solid #DEE2E6;
+    }
+
+    .btn-create {
+        background: white;
+        padding: 10px 20px;
+        border-radius: 10px;
+        border: 1px solid #DEE2E6;
+        border-radius: 5px;
+        text-decoration: none;
+    }
+
+    .btn-view {
+        text-decoration: none;
+        color: #336699;
+    }
+
+    #brandCount {
+        font-size: 14px;
+        color: #212529;
+        padding: 5px 10px;
+        border-radius: 5px;
+        margin-left: 10px;
+    }
+</style>
+
+<div class="container mt-4">
+    <div class="header">Brands</div>
+
+    <div class="table-container">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="search-container d-flex gap-2">
+                <input type="text" id="searchBrand" placeholder="Search..." class="form-control">
+                <input type="date" id="filterStartDate" class="form-control">
+                <input type="date" id="filterEndDate" class="form-control">
+                <button id="filterBtn" class="btn btn-primary">Filter</button>
+            </div>
+            <div class="d-flex align-items-center">
+                <button class="btn-create" data-bs-toggle="modal" data-bs-target="#createBrandModal">Create
+                    Brand</button>
+                <span id="brandCount" class="badge">0 Brands</span>
+            </div>
+        </div>
+
+        <table class="table table-bordered">
+            <thead class="table-header">
+                <tr>
+                    <th>S.No.</th>
+                    <th>Brand Name</th>
+                    <th>Brand ID</th>
+                    <th>Email</th>
+                    <th>Phone Number</th>
+                    <th>Address</th>
+                    <th>Created At</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="brandTableBody">
+                {% for brand in brands %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ brand.name }}</td>
+                    <td>{{ brand.brand_id }}</td>
+                    <td>{{ brand.email }}</td>
+                    <td>{{ brand.phone }}</td>
+                    <td>{{ brand.address }}</td>
+                    <td>{{ brand.created_at }}</td>
+                    <td><a href="/brand/{{ brand.brand_id }}/" class="btn-view">View &nearr;</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Create Brand Modal -->
+<div class="modal fade" id="createBrandModal" tabindex="-1" aria-labelledby="createBrandModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-0">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createBrandModalLabel">Create Brand</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createBrandForm" method="POST">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="brandName" class="form-label">Brand Name</label>
+                        <input type="text" id="brandName" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="brandID" class="form-label">Brand ID</label>
+                        <input type="text" id="brandID" class="form-control" readonly required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="brandEmail" class="form-label">Email</label>
+                        <input type="email" id="brandEmail" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="brandPhone" class="form-label">Phone Number</label>
+                        <input type="text" id="brandPhone" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="brandAddress" class="form-label">Address</label>
+                        <textarea id="brandAddress" class="form-control" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Create Brand</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function () {
+        function generateBrandID() {
+            let timestamp = new Date().getTime();
+            let brandID = "BR" + timestamp.toString().slice(-6);
+            $("#brandID").val(brandID);
+        }
+
+        $("#createBrandModal").on("show.bs.modal", function () {
+            generateBrandID();
+        });
+
+        $("#createBrandForm").on("submit", function (event) {
+            event.preventDefault();
+
+            let formData = {
+                csrfmiddlewaretoken: $("input[name=csrfmiddlewaretoken]").val(),
+                name: $("#brandName").val(),
+                brand_id: $("#brandID").val(),
+                email: $("#brandEmail").val(),
+                phone: $("#brandPhone").val(),
+                address: $("#brandAddress").val()
+            };
+
+            $.ajax({
+                url: "/create_brand/",
+                method: "POST",
+                data: formData,
+                success: function (response) {
+                    console.log("Success:", response);
+                    let newRow = `<tr>
+            <td>${$("#brandTableBody tr").length + 1}</td>
+            <td>${response.name}</td>
+            <td>${response.brand_id}</td>
+            <td>${response.email}</td>
+            <td>${response.phone}</td>
+            <td>${response.address}</td>
+            <td>${response.created_at}</td>
+            <td><a href="/brand/{{ brand.brand_id }}/" class="btn-view">View &nearr;</a></td>
+        </tr>`;
+
+                    $("#brandTableBody").append(newRow);
+                    $("#brandCount").text(`${$("#brandTableBody tr").length} Brands`);
+                    $("#createBrandModal").modal("hide");
+                    $("#createBrandForm")[0].reset();
+                    location.reload();
+
+                },
+                error: function (xhr) {
+                    console.log("Error:", xhr.responseText);
+                    alert("Error saving brand.");
+                },
+            });
+        });
+    });
+    $(document).ready(function () {
+        function fetchBrands(query = "", startDate = "", endDate = "") {
+            $.ajax({
+                url: "/get_brands/",
+                method: "GET",
+                data: { query: query, start_date: startDate, end_date: endDate },
+                success: function (response) {
+                    let rows = "";
+                    response.forEach((brand, index) => {
+                        rows += `<tr>
+                <td>${index + 1}</td>
+                <td>${brand.name}</td>
+                <td>${brand.brand_id}</td>
+                <td>${brand.email}</td>
+                <td>${brand.phone}</td>
+                <td>${brand.address}</td>
+                <td>${brand.created_at}</td>
+                <td><a href="/brand/${brand.brand_id}/" class="btn-view">View &nearr;</a></td>
+            </tr>`;
+                    });
+
+                    $("#brandTableBody").html(rows);
+                    $("#brandCount").text(`${response.length} Brands`);
+                }
+            });
+        }
+
+        $("#searchBrand").on("keyup", function () {
+            fetchBrands($(this).val(), $("#filterStartDate").val(), $("#filterEndDate").val());
+        });
+
+        $("#filterBtn").on("click", function () {
+            fetchBrands($("#searchBrand").val(), $("#filterStartDate").val(), $("#filterEndDate").val());
+        });
+
+        function generateBrandID() {
+            let timestamp = new Date().getTime();
+            let brandID = "BR" + timestamp.toString().slice(-6);
+            $("#brandID").val(brandID);
+        }
+
+        $("#createBrandModal").on("show.bs.modal", function () {
+            generateBrandID();
+        });
+
+        fetchBrands();
+    });
+</script>
+
+{% endblock %}

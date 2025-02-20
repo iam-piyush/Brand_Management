@@ -1,0 +1,546 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Brands - Brand Management{% endblock %}
+
+{% block content %}
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+
+    .header {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #DEE2E6;
+        text-align: center;
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 30px;
+    }
+
+    .table-header {
+        background: white;
+    }
+
+    .details-card {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #DEE2E6;
+        margin-bottom: 20px;
+    }
+
+    .btn-create {
+        background: white;
+        padding: 10px 20px;
+        border-radius: 10px;
+        border: 1px solid #DEE2E6;
+        border-radius: 5px;
+        text-decoration: none;
+        margin: 0px 5px;
+    }
+
+    .btn-view {
+        text-decoration: none;
+        color: #336699;
+    }
+
+    #campaignCount {
+        font-size: 14px;
+        color: #212529;
+        padding: 5px 10px;
+        border-radius: 5px;
+        margin-left: 10px;
+    }
+
+    .copy-icon {
+        cursor: pointer;
+        color: #007bff;
+    }
+
+    .copy-icon:hover {
+        color: #0056b3;
+    }
+
+    .select-newsletter {
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .select-newsletter:hover {
+        transform: scale(1.05);
+        box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+    }
+</style>
+</head>
+
+<body>
+
+    <div class="container mt-4">
+        <div class="header">{{ brand.name }} - Campaigns</div>
+
+        <!-- Brand Details -->
+        <div class="details-card">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Brand Name:</strong> {{ brand.name }}</p>
+                    <p><strong>Brand ID:</strong> {{ brand.brand_id }}</p>
+                    <p><strong>Email:</strong> {{ brand.email }}</p>
+                </div>
+
+                <div class="col-md-6">
+                    <p><strong>Phone Number:</strong> {{ brand.phone }}</p>
+                    <p><strong>Address:</strong> {{ brand.address }}</p>
+                    <p>
+                        <strong>Subscription Link:</strong>
+                        <span class="d-none" id="subscriptionLink">{{ subscription_link }}</span>
+                        <span>Copy</span>
+                        <i class="fa fa-copy copy-icon" onclick="copyToClipboard()"></i>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Campaigns Section -->
+        <div class="table-container">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="search-container d-flex gap-2">
+                    <input type="text" id="searchCampaign" placeholder="Search..." class="form-control">
+                    <input type="date" id="filterStartDate" class="form-control">
+                    <input type="date" id="filterEndDate" class="form-control">
+                    <button id="filterBtn" class="btn btn-primary" onclick="filterCampaigns()">Filter</button>
+                </div>
+                <div class="d-flex align-items-center">
+                    <button class="btn-create" data-bs-toggle="modal" data-bs-target="#createCampaignModal">Create
+                        Campaign</button>
+                    <span id="campaignCount" class="badge">{{ campaigns|length }} Campaigns</span>
+                </div>
+            </div>
+
+
+            <table class="table table-bordered">
+                <thead class="table-header">
+                    <tr>
+                        <th>S.No.</th>
+                        <th>Campaign Name</th>
+                        <th>Campaign ID</th>
+                        <th>Created Date</th>
+                        <th>Coupon</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="campaignTableBody">
+                    {% for campaign in campaigns %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ campaign.name }}</td>
+                        <td>{{ campaign.campaign_id }}</td>
+                        <td>{{ campaign.created_at }}</td>
+                        <td>
+                            {% if campaign.coupon_id %}
+                            {{ campaign.coupon_id }}
+                            {% else %}
+                            <button class="btn btn-sm btn-primary create-coupon-btn" data-bs-toggle="modal"
+                                data-bs-target="#createCouponModal" data-campaign-id="{{ campaign.campaign_id }}">
+                                <i class="fas fa-plus"></i>
+                            </button>
+
+                            {% endif %}
+                        </td>
+                        <td><a href="/campaign/{{ campaign.campaign_id }}/" class="btn-view">View &nearr;</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Create Campaign Modal -->
+    <div class="modal fade" id="createCampaignModal" tabindex="-1" aria-labelledby="createCampaignModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-0">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create Campaign</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createCampaignForm" method="POST">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label">Brand ID</label>
+                            <input type="text" id="brandID" class="form-control" value="{{ brand.brand_id }}" readonly>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Campaign Name</label>
+                            <input type="text" id="campaignName" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Campaign ID</label>
+                            <input type="text" id="campaignID" class="form-control" readonly required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Create Campaign</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Coupon Modal -->
+    <div class="modal fade" id="createCouponModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-0">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create Coupon</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createCouponForm">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label">Coupon ID</label>
+                            <input type="text" id="couponID" class="form-control" readonly>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Campaign ID</label>
+                            <input type="text" id="displayCampaignId" class="form-control" readonly>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Coupon Type</label>
+                            <select id="couponType" class="form-select">
+                                <option value="" selected disabled>Select Coupon Type</option>
+                                <option value="Flat Discount">Flat Discount</option>
+                                <option value="Percentage Discount">Percentage Discount</option>
+                                <option value="Bundle Offer">Bundle Offer</option>
+                                <option value="Buy X Get Y">Buy X Get Y</option>
+                                <option value="Custom">Custom</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3" id="buyXGetYFields" style="display: none;">
+                            <label class="form-label">Buy X</label>
+                            <input type="number" id="buyX" class="form-control">
+
+                            <label class="form-label mt-2">Get Y</label>
+                            <input type="number" id="getY" class="form-control">
+                        </div>
+
+                        <div class="mb-3" id="customCouponTypeField" style="display: none;">
+                            <label class="form-label">Custom Coupon Type</label>
+                            <input type="text" id="customCouponType" class="form-control">
+                        </div>
+
+                        <div class="mb-3" id="flatDiscountField" style="display: none;">
+                            <label class="form-label">Discount Price (₹)</label>
+                            <input type="number" id="flatDiscountValue" class="form-control" step="0.01" min="0">
+                        </div>
+
+                        <div class="mb-3" id="percentageDiscountField" style="display: none;">
+                            <label class="form-label">Discount Percentage (%)</label>
+                            <input type="number" id="percentageDiscountValue" class="form-control" step="0.01" min="0"
+                                max="100">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Minimum Bill Amount</label>
+                            <input type="number" id="billCount" class="form-control" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Applicable Days</label>
+                            <div id="couponDays">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="coupon_days" value="Monday">
+                                    <label class="form-check-label">Monday</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="coupon_days" value="Tuesday">
+                                    <label class="form-check-label">Tuesday</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="coupon_days"
+                                        value="Wednesday">
+                                    <label class="form-check-label">Wednesday</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="coupon_days" value="Thursday">
+                                    <label class="form-check-label">Thursday</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="coupon_days" value="Friday">
+                                    <label class="form-check-label">Friday</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="coupon_days" value="Saturday">
+                                    <label class="form-check-label">Saturday</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="coupon_days" value="Sunday">
+                                    <label class="form-check-label">Sunday</label>
+                                </div>
+                            </div>
+                        </div>
+
+
+                        <div class="mb-3">
+                            <label class="form-label">Expiration Date</label>
+                            <input type="date" id="expirationDate" class="form-control" required>
+                        </div>
+
+                        <input type="hidden" id="newsletterID" value="{{ newsletter.newsletter_id }}">
+                        <button type="submit" class="btn btn-primary w-100">Create Coupon</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function generateCampaignID() {
+            let timestamp = new Date().getTime();
+            let campaignID = "CMP" + timestamp.toString().slice(-6);
+            $("#campaignID").val(campaignID);
+        }
+
+        function copyToClipboard() {
+            var copyText = document.getElementById("subscriptionLink").innerText;
+            navigator.clipboard.writeText(copyText);
+            alert("Subscription link copied to clipboard!");
+        }
+
+        // Campaign Modal Handlers
+        $("#createCampaignModal").on("show.bs.modal", function () {
+            generateCampaignID();
+        });
+
+        // Campaign Form Submit Handler
+        $("#createCampaignForm").on("submit", function (event) {
+            event.preventDefault();
+
+            let brandId = $("#brandID").val();
+            let formData = {
+                csrfmiddlewaretoken: $("input[name=csrfmiddlewaretoken]").val(),
+                name: $("#campaignName").val(),
+                campaign_id: $("#campaignID").val(),
+            };
+
+            $.ajax({
+                url: `/create_campaign/${brandId}/`,
+                method: "POST",
+                data: formData,
+                success: function (response) {
+                    let newRow = `
+                <tr>
+                    <td>${$("#campaignTableBody tr").length + 1}</td>
+                    <td>${response.name}</td>
+                    <td>${response.campaign_id}</td>
+                    <td>${response.created_at}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary create-coupon-btn"
+                                data-bs-toggle="modal"
+                                data-bs-target="#createCouponModal"
+                                data-campaign-id="${response.campaign_id}">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </td>
+                    <td><a href="/campaign/${response.campaign_id}/" class="btn-view">View &nearr;</a></td>
+                </tr>`;
+
+                    $("#campaignTableBody").append(newRow);
+                    $("#campaignCount").text(`${$("#campaignTableBody tr").length} Campaigns`);
+                    $("#createCampaignModal").modal("hide");
+                    $("#createCampaignForm")[0].reset();
+
+                    // Reattach event listeners for new buttons
+                    attachCouponButtonListeners();
+                },
+                error: function () {
+                    alert("Error saving campaign.");
+                }
+            });
+        });
+
+        // Coupon Type Change Handler
+        $("#couponType").change(function () {
+            let type = $(this).val();
+            $("#flatDiscountField, #percentageDiscountField, #customCouponTypeField, #buyXGetYFields").hide();
+
+            switch (type) {
+                case "Flat Discount":
+                    $("#flatDiscountField").show();
+                    break;
+                case "Percentage Discount":
+                    $("#percentageDiscountField").show();
+                    break;
+                case "Custom":
+                    $("#customCouponTypeField").show();
+                    break;
+                case "Buy X Get Y":
+                    $("#buyXGetYFields").show();
+                    break;
+            }
+        });
+
+        // Coupon Form Submit Handler
+        $("#createCouponForm").on("submit", function (event) {
+            event.preventDefault();
+
+            let couponType = $("#couponType").val();
+            let discountValue = (couponType === "Flat Discount") ? $("#flatDiscountValue").val() :
+                (couponType === "Percentage Discount") ? $("#percentageDiscountValue").val() : null;
+            let buyX = (couponType === "Buy X Get Y") ? $("#buyX").val() : null;
+            let getY = (couponType === "Buy X Get Y") ? $("#getY").val() : null;
+
+            let selectedDays = $("input[name='coupon_days']:checked").map(function () {
+                return $(this).val();
+            }).get().join(", ");
+
+            if (!selectedDays) {
+                alert("Please select at least one applicable day.");
+                return;
+            }
+
+            let formData = {
+                csrfmiddlewaretoken: $("input[name=csrfmiddlewaretoken]").val(),
+                coupon_id: $("#couponID").val(),
+                campaign_id: $("#campaignIdInput").val(),
+                coupon_type: couponType,
+                discount_value: discountValue,
+                bill_count: $("#billCount").val(),
+                coupon_days: selectedDays,
+                expiration_date: $("#expirationDate").val() || null,
+                buy_x: buyX,
+                get_y: getY
+            };
+
+            let url = `/create_coupon/${formData.campaign_id}/`;
+
+            $.ajax({
+                url: url,
+                method: "POST",
+                headers: { "X-CSRFToken": formData.csrfmiddlewaretoken },
+                data: JSON.stringify(formData),
+                contentType: "application/json",
+                success: function (response) {
+                    if (response.message) {
+                        const button = document.querySelector(`[data-campaign-id="${formData.campaign_id}"]`);
+                        const couponCell = button.closest('td');
+                        couponCell.innerHTML = formData.coupon_id;
+
+                        $("#createCouponModal").modal("hide");
+                        $("#createCouponForm")[0].reset();
+                    } else {
+                        alert("Error: " + response.error);
+                    }
+                },
+                error: function () {
+                    alert("Error creating coupon.");
+                }
+            });
+        });
+
+        // Function to attach event listeners to coupon buttons
+        function attachCouponButtonListeners() {
+            document.querySelectorAll(".create-coupon-btn").forEach(button => {
+                button.addEventListener("click", function () {
+                    let campaignId = this.getAttribute("data-campaign-id");
+                    let timestamp = new Date().getTime();
+                    let couponId = "CUP" + timestamp.toString().slice(-6);
+
+                    console.log("Campaign ID:", campaignId); // Debug log
+                    console.log("Generated Coupon ID:", couponId); // Debug log
+
+                    // Set the coupon ID
+                    document.getElementById("couponID").value = couponId;
+
+                    // Set the campaign ID in display field
+                    document.getElementById("displayCampaignId").value = campaignId;
+
+                    // Set the campaign ID in hidden input
+                    if (!document.getElementById("campaignIdInput")) {
+                        const input = document.createElement("input");
+                        input.type = "hidden";
+                        input.id = "campaignIdInput";
+                        document.getElementById("createCouponForm").appendChild(input);
+                    }
+                    document.getElementById("campaignIdInput").value = campaignId;
+                });
+            });
+        }
+
+        // Initial load of campaigns
+        $(document).ready(function () {
+            let brandId = $("#brandID").val();
+
+            $.ajax({
+                url: `/get_campaigns/?brand_id=${brandId}`,
+                method: 'GET',
+                success: function (response) {
+                    let campaignTableBody = document.getElementById('campaignTableBody');
+                    campaignTableBody.innerHTML = '';
+
+                    response.forEach(function (campaign, index) {
+                        let couponColumn = campaign.coupon_id ?
+                            `<td>${campaign.coupon_id}</td>` :
+                            `<td>
+                        <button class="btn btn-sm btn-primary create-coupon-btn"
+                                data-bs-toggle="modal"
+                                data-bs-target="#createCouponModal"
+                                data-campaign-id="${campaign.campaign_id}">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </td>`;
+
+                        let newRow = `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${campaign.name}</td>
+                        <td>${campaign.campaign_id}</td>
+                        <td>${campaign.created_at}</td>
+                        ${couponColumn}
+                        <td><a href="/campaign/${campaign.campaign_id}/" class="btn-view">View &nearr;</a></td>
+                    </tr>`;
+
+                        campaignTableBody.insertAdjacentHTML('beforeend', newRow);
+                    });
+
+                    // Attach event listeners after loading campaigns
+                    attachCouponButtonListeners();
+                },
+                error: function () {
+                    alert('Error fetching campaigns');
+                }
+            });
+        });
+
+        // Search and Filter Functionality
+        function filterCampaigns() {
+            let searchText = $("#searchCampaign").val().toLowerCase();
+            let startDate = $("#filterStartDate").val();
+            let endDate = $("#filterEndDate").val();
+
+            $("#campaignTableBody tr").each(function () {
+                let campaignName = $(this).find("td:eq(1)").text().toLowerCase();
+                let campaignDate = $(this).find("td:eq(3)").text();
+
+                let showBySearch = !searchText || campaignName.includes(searchText);
+                let showByDate = (!startDate || !endDate) ||
+                    (campaignDate >= startDate && campaignDate <= endDate);
+
+                $(this).toggle(showBySearch && showByDate);
+            });
+        }
+
+        // Attach search and filter events
+        $("#searchCampaign").on("keyup", filterCampaigns);
+        $("#filterStartDate, #filterEndDate").on("change", filterCampaigns);
+        $("#filterBtn").on("click", filterCampaigns);
+
+    </script>
+
+    {% endblock %}

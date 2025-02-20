@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Brands - Brand Management{% endblock %}
+
+{% block content %}
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+
+    .header {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #DEE2E6;
+        text-align: center;
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 30px;
+    }
+
+    .search-container {
+        display: flex;
+        gap: 10px;
+    }
+
+    .subscriber-count {
+        font-size: 14px;
+        color: #212529;
+        padding: 5px 10px;
+        border-radius: 5px;
+        margin-left: 10px;
+    }
+
+    .table th,
+    .table td {
+        vertical-align: middle;
+        text-align: center;
+    }
+
+    .group-radio input {
+        margin-right: 5px;
+    }
+</style>
+</head>
+
+<body>
+    <div class="container mt-4">
+        <div class="header">Subscribers</div>
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="search-container">
+                <input type="text" id="search" placeholder="Search by name, email, or phone" class="form-control">
+                <input type="date" id="start_date" class="form-control">
+                <input type="date" id="end_date" class="form-control">
+                <button id="filterBtn" class="btn btn-primary">Filter</button>
+            </div>
+            <div class="subscriber-count">Total Subscribers: <span id="subscriberCount">0</span></div>
+        </div>
+
+        <table class="table table-bordered">
+            <thead class="table-light">
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Subscriber ID</th>
+                    <th>Subscribed At</th>
+                    <th>Group</th>
+                </tr>
+            </thead>
+            <tbody id="subscriberTable">
+
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        $(document).ready(function () {
+            function fetchSubscribers(query = "", startDate = "", endDate = "") {
+                $.ajax({
+                    url: "{% url 'subscribers' %}",
+                    type: "GET",
+                    data: { query: query, start_date: startDate, end_date: endDate },
+                    success: function (response) {
+                        let subscriberTable = $("#subscriberTable");
+                        subscriberTable.empty();
+                        $("#subscriberCount").text(response.length);
+
+                        response.forEach(subscriber => {
+                            subscriberTable.append(`
+                    <tr>
+                        <td>${subscriber.name}</td>
+                        <td>${subscriber.email}</td>
+                        <td>${subscriber.phone}</td>
+                        <td>${subscriber.subscriber_id}</td>
+                        <td>${subscriber.subscribed_at}</td>
+                        <td class="group-radio">
+                            <input type="radio" name="group_${subscriber.subscriber_id}" value="A" ${subscriber.group === 'A' ? 'checked' : ''} data-id="${subscriber.subscriber_id}"> A
+                            <input type="radio" name="group_${subscriber.subscriber_id}" value="B" ${subscriber.group === 'B' ? 'checked' : ''} data-id="${subscriber.subscriber_id}"> B
+                            <input type="radio" name="group_${subscriber.subscriber_id}" value="C" ${subscriber.group === 'C' ? 'checked' : ''} data-id="${subscriber.subscriber_id}"> C
+                            <input type="radio" name="group_${subscriber.subscriber_id}" value="D" ${subscriber.group === 'D' ? 'checked' : ''} data-id="${subscriber.subscriber_id}"> D
+                        </td>
+                    </tr>
+                `);
+                        });
+
+                        $(".group-radio input").on("change", function () {
+                            let subscriberId = $(this).data("id");
+                            let group = $(this).val();
+
+                            $.ajax({
+                                url: "{% url 'update_subscriber_group' %}",
+                                type: "POST",
+                                data: {
+                                    subscriber_id: subscriberId,
+                                    group: group,
+                                    csrfmiddlewaretoken: "{{ csrf_token }}"
+                                },
+                                success: function (response) {
+                                    console.log("Group updated:", response.message);
+                                },
+                                error: function (xhr, status, error) {
+                                    console.error("Error updating group:", error);
+                                }
+                            });
+                        });
+                    }
+                });
+            }
+
+            $("#search").on("keyup", function () {
+                fetchSubscribers($(this).val(), $("#start_date").val(), $("#end_date").val());
+            });
+
+            $("#start_date, #end_date").on("change", function () {
+                fetchSubscribers($("#search").val(), $("#start_date").val(), $("#end_date").val());
+            });
+
+            fetchSubscribers();
+        });
+
+    </script>
+
+    {% endblock %}
