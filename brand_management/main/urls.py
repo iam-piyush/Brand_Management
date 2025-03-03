@@ -9,7 +9,7 @@ urlpatterns = [
     path("brand/<str:brand_id>/", views.brand_detail, name="brand_detail"),
 
     # Campaign-related URLs
-    path("campaigns/", views.get_campaigns, name="get_campaigns"),
+    path("campaigns/", views.campaigns, name="campaigns"),
     path("create_campaign/<str:brand_id>/", views.create_campaign, name="create_campaign"),
     path("get_campaigns/", views.get_campaigns, name="get_campaigns"),
 
@@ -17,6 +17,7 @@ urlpatterns = [
     path('newsletters/', views.newsletter_list, name='newsletter_list'),
     path('api/create-newsletter/', views.create_newsletter, name='create_newsletter'),
     path('newsletter/<str:newsletter_id>/', views.newsletter_detail, name='newsletter_detail'),
+    path('api/generate-subscriber-pdfs/', views.generate_subscriber_pdfs, name='generate-subscriber-pdfs'),
 
     # Subscription URLs
     path("subscribe/", views.subscribe, name="subscribe"),
@@ -27,13 +28,22 @@ urlpatterns = [
     path("update_subscriber_group/", views.update_subscriber_group, name="update_subscriber_group"),
 
     # Coupons-related URLs
-    path("coupons/", views.coupons_list, name="coupons_list"),
+    path("coupons/", views.coupons, name="coupons"),
     path('create_coupon/<str:campaign_id>/', views.create_coupon, name='create_coupon'),
     path("get_coupons/<str:newsletter_id>/", views.get_coupons, name="get_coupons"),
+    path("coupon/<str:coupon_id>/", views.coupon_detail, name="coupon_detail"),
 
     # PDF Related
     path('api/process-template/', views.process_template, name='process-template'),
     path('api/generate-preview/', views.generate_preview, name='generate-preview'),
 
     #Coupon Reedem
+    path('redeem/<str:tracking_id>/', views.redeem_coupon, name='redeem_coupon'),
+    path("validate-coupon/<str:brand_id>/", views.validate_coupon, name="validate_coupon"),
+
+    #brand login
+    path('brand_login/', views.brand_login, name='brand_login'),
+    path('verify_otp/', views.verify_otp, name='verify_otp'),
+    path('brand/dashboard/<str:brand_id>/', views.brand_dashboard, name='brand_dashboard'),
+    path('brand/analytics/<str:brand_id>/', views.brand_analytics, name='brand_analytics'),
 ]

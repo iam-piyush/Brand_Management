@@ -5,6 +5,7 @@ from django.http import JsonResponse
 import os, json
 from django.utils.timezone import now
 from django.core.files.storage import default_storage
+import datetime
 
 class Brand(models.Model):
     name = models.CharField(max_length=255)
@@ -99,6 +100,13 @@ class Coupon(models.Model):
     buy_x = models.IntegerField(blank=True, null=True)
     get_y = models.IntegerField(blank=True, null=True)
 
+    def is_expired(self):
+        return self.expiration_date and self.expiration_date < datetime.date.today()
+
+    def is_valid_today(self):
+        today = now().strftime("%A")
+        return "All Days" in self.coupon_days or today in self.coupon_days
+
     def __str__(self):
         return self.coupon_id
 
@@ -110,3 +118,9 @@ class TrackingLink(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     clicked = models.BooleanField(default=False)
     clicked_at = models.DateTimeField(null=True, blank=True)
+    redeemed = models.BooleanField(default=False)
+    redeemed_at = models.DateTimeField(null=True, blank=True)
+    bill_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # New field
+
+    def __str__(self):
+        return f"{self.unique_id} - {self.coupon.coupon_id} - {'Redeemed' if self.redeemed else 'Not Redeemed'}"

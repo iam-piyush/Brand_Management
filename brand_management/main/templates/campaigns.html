@@ -50,13 +50,12 @@
             <input type="date" id="end_date" class="form-control">
             <button id="filterBtn" class="btn btn-primary">Filter</button>
 
-            <!-- Brand Dropdown -->
-            <select id="brandFilter" class="form-select">
+            <!-- <select id="brandFilter" class="form-select">
                 <option value="">All Brands</option>
                 {% for brand in brands %}
                 <option value="{{ brand.id }}">{{ brand.name }}</option>
                 {% endfor %}
-            </select>
+            </select> -->
         </div>
         <div class="campaign-count">Total Campaigns: <span id="campaignCount">{{ campaigns|length }}</span></div>
     </div>
@@ -68,8 +67,8 @@
                 <th>Name</th>
                 <th>Created At</th>
                 <th>Brand</th>
+                <th>Coupon ID</th>
                 <th>Newsletter ID</th>
-                <th>Subscriber Base</th>
             </tr>
         </thead>
         <tbody id="campaignTable">
@@ -78,15 +77,9 @@
                 <td>{{ campaign.campaign_id }}</td>
                 <td>{{ campaign.name }}</td>
                 <td>{{ campaign.created_at }}</td>
-                <td>{{ campaign.brand.name }}</td>
-                <td>
-                    {% for newsletter in campaign.newsletters.all %}
-                    <span>{{ newsletter.newsletter_id }}</span>
-                    {% empty %}
-                    N/A
-                    {% endfor %}
-                </td>
-                <td>{{ campaign.subscriber_base }}</td>
+                <td>{{ campaign.brand_name }}</td>
+                <td>{{ campaign.coupon_id }}</td>
+                <td>{{ campaign.newsletter_id }}</td>
             </tr>
             {% empty %}
             <tr>
@@ -99,46 +92,59 @@
 
 <script>
     $(document).ready(function () {
-        function fetchCampaigns(query = "", startDate = "", endDate = "", brandId = "") {
+        let debounceTimer;
+
+        function fetchCampaigns() {
+            let query = $("#search").val().trim();
+            let startDate = $("#start_date").val();
+            let endDate = $("#end_date").val();
+            let brandId = $("#brandFilter").val();
+
             $.ajax({
-                url: "{% url 'get_campaigns' %}",
+                url: "{% url 'campaigns' %}",
                 type: "GET",
                 data: { query: query, start_date: startDate, end_date: endDate, brand_id: brandId },
+                dataType: "json",
                 success: function (response) {
                     let campaignTable = $("#campaignTable");
                     campaignTable.empty();
                     $("#campaignCount").text(response.length);
 
-                    response.forEach(campaign => {
-                        let newsletterDisplay = campaign.newsletters.length > 0
-                            ? campaign.newsletters.map(nl => `<span>${nl}</span>`).join('')
-                            : 'N/A';
-
-                        campaignTable.append(`
-                        <tr>
-                            <td>${campaign.campaign_id}</td>
-                            <td>${campaign.name}</td>
-                            <td>${campaign.created_at}</td>
-                            <td>${campaign.brand}</td>
-                            <td>${newsletterDisplay}</td>
-                            <td>${campaign.subscriber_base}</td>
-                        </tr>
-                    `);
-                    });
+                    if (response.length > 0) {
+                        response.forEach(campaign => {
+                            campaignTable.append(`
+                                <tr>
+                                    <td>${campaign.campaign_id}</td>
+                                    <td>${campaign.name}</td>
+                                    <td>${campaign.created_at}</td>
+                                    <td>${campaign.brand_name}</td>
+                                    <td>${campaign.coupon_id}</td>
+                                    <td>${campaign.newsletter_id}</td>
+                                </tr>
+                            `);
+                        });
+                    } else {
+                        campaignTable.append(`<tr><td colspan="6" class="text-center">No campaigns found.</td></tr>`);
+                    }
+                },
+                error: function (error) {
+                    console.log("Error fetching campaigns:", error);
                 }
             });
         }
 
-        $("#search").on("keyup", function () {
-            fetchCampaigns($(this).val(), $("#start_date").val(), $("#end_date").val(), $("#brandFilter").val());
-        });
+        function debounceFetch() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(fetchCampaigns, 300);
+        }
 
-        $("#start_date, #end_date, #brandFilter").on("change", function () {
-            fetchCampaigns($("#search").val(), $("#start_date").val(), $("#end_date").val(), $("#brandFilter").val());
-        });
+        $("#search").on("input", debounceFetch);
+        $("#start_date, #end_date, #brandFilter").on("change", fetchCampaigns);
 
         fetchCampaigns();
     });
 </script>
+
+
 
 {% endblock %}

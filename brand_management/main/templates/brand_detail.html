@@ -128,7 +128,6 @@
                         <th>Campaign ID</th>
                         <th>Created Date</th>
                         <th>Coupon</th>
-                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody id="campaignTableBody">
@@ -149,7 +148,6 @@
 
                             {% endif %}
                         </td>
-                        <td><a href="/campaign/{{ campaign.campaign_id }}/" class="btn-view">View &nearr;</a></td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -503,7 +501,6 @@
                         <td>${campaign.campaign_id}</td>
                         <td>${campaign.created_at}</td>
                         ${couponColumn}
-                        <td><a href="/campaign/${campaign.campaign_id}/" class="btn-view">View &nearr;</a></td>
                     </tr>`;
 
                         campaignTableBody.insertAdjacentHTML('beforeend', newRow);

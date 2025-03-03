@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Coupons - Brand Management{% endblock %}
+
+{% block content %}
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+
+    .header {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #DEE2E6;
+        text-align: center;
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 30px;
+    }
+
+    .search-container {
+        display: flex;
+        gap: 10px;
+    }
+
+    .coupon-count {
+        font-size: 14px;
+        color: #212529;
+        padding: 5px 10px;
+        border-radius: 5px;
+        margin-left: 10px;
+    }
+
+    .table th,
+    .table td {
+        vertical-align: middle;
+        text-align: center;
+    }
+
+    .btn-view {
+        color: #007bff;
+        text-decoration: none;
+        font-weight: bold;
+    }
+
+    .btn-view:hover {
+        text-decoration: underline;
+    }
+</style>
+
+<div class="container mt-4">
+    <div class="header">Coupons</div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="search-container">
+            <input type="text" id="search" placeholder="Search coupons" class="form-control">
+            <input type="date" id="start_date" class="form-control">
+            <input type="date" id="end_date" class="form-control">
+            <button id="filterBtn" class="btn btn-primary">Filter</button>
+        </div>
+        <div class="coupon-count">Total Coupons: <span id="couponCount">{{ coupons|length }}</span></div>
+    </div>
+
+    <table class="table table-bordered">
+        <thead class="table-light">
+            <tr>
+                <th>Coupon ID</th>
+                <th>Campaign ID</th>
+                <th>Brand</th>
+                <th>Created At</th>
+                <th>Coupon Type</th>
+                <th>Min. Bill Amount</th>
+                <th>Expiration Date</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="couponTable">
+            {% for coupon in coupons %}
+            <tr>
+                <td>{{ coupon.coupon_id }}</td>
+                <td>{{ coupon.campaign.campaign_id }}</td>
+                <td>{{ coupon.campaign.brand.name }}</td>
+                <td>{{ coupon.created_at }}</td>
+                <td>{{ coupon.coupon_type }}</td>
+                <td>{{ coupon.bill_count }}</td>
+                <td>{{ coupon.expiration_date }}</td>
+                <td><a href="{% url 'coupon_detail' coupon.coupon_id %}" class="btn-view">View &nearr;</a></td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" class="text-center">No coupons found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    $(document).ready(function () {
+        let debounceTimer;
+
+        function fetchCoupons() {
+            let query = $("#search").val().trim();
+            let startDate = $("#start_date").val();
+            let endDate = $("#end_date").val();
+
+            $.ajax({
+                url: "{% url 'coupons' %}",
+                type: "GET",
+                data: { query: query, start_date: startDate, end_date: endDate },
+                dataType: "json",
+                success: function (response) {
+                    let couponTable = $("#couponTable");
+                    couponTable.empty();
+                    $("#couponCount").text(response.length);
+
+                    if (response.length > 0) {
+                        response.forEach(coupon => {
+                            couponTable.append(`
+                                <tr>
+                                    <td>${coupon.coupon_id}</td>
+                                    <td>${coupon.campaign_id}</td>
+                                    <td>${coupon.brand_name}</td>
+                                    <td>${coupon.created_at}</td>
+                                    <td>${coupon.coupon_type}</td>
+                                    <td>${coupon.bill_count}</td>
+                                    <td>${coupon.expiration_date}</td>
+                                    <td><a href="/coupon/${coupon.coupon_id}/" class="btn-view">View &nearr;</a></td>
+                                </tr>
+                            `);
+                        });
+                    } else {
+                        couponTable.append(`<tr><td colspan="8" class="text-center">No coupons found.</td></tr>`);
+                    }
+                },
+                error: function (error) {
+                    console.log("Error fetching coupons:", error);
+                }
+            });
+        }
+
+        function debounceFetch() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(fetchCoupons, 300);
+        }
+
+        $("#search").on("input", debounceFetch);
+        $("#start_date, #end_date").on("change", fetchCoupons);
+
+        fetchCoupons();
+    });
+</script>
+
+{% endblock %}

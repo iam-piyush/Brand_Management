@@ -14,7 +14,7 @@ SECRET_KEY = 'django-insecure-um)chp6$8fdo!l^)+u#&d$1dm0@s=(5!0tx^$xlhz*)1+rpk&5
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -119,3 +119,12 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 SUBSCRIPTION_LINK = "http://127.0.0.1:8000/subscribe"
 
 REDEEM_LINK = "http://127.0.0.1:8000/redeem"
+
+
+# For Email OTP, add these to settings.py:
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'  # Or your email provider's SMTP server
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'pkpiyush988@gmail.com'
+EMAIL_HOST_PASSWORD = 'eydi fzmr tjuo emto'

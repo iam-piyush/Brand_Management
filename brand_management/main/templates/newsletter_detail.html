@@ -112,6 +112,68 @@
         <div id="previewContainer">
             <iframe id="previewFrame" class="preview-frame"></iframe>
         </div>
+        <div class="text-end mt-3">
+            <button id="finalizeButton" class="btn btn-success" style="display: none;">
+                Finalize Newsletter
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Finalization Modal -->
+<div class="modal fade" id="finalizeModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Finalize Newsletter</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <h6>Select Subscriber Groups</h6>
+                <form id="subscriberGroupForm">
+                    <div class="subscriber-group">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="A" id="groupA">
+                            <label class="form-check-label" for="groupA">
+                                Group A
+                            </label>
+                        </div>
+                    </div>
+                    <div class="subscriber-group">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="B" id="groupB">
+                            <label class="form-check-label" for="groupB">
+                                Group B
+                            </label>
+                        </div>
+                    </div>
+                    <div class="subscriber-group">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="C" id="groupC">
+                            <label class="form-check-label" for="groupC">
+                                Group C
+                            </label>
+                        </div>
+                    </div>
+                    <div class="subscriber-group">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="D" id="groupD">
+                            <label class="form-check-label" for="groupD">
+                                Group D
+                            </label>
+                        </div>
+                    </div>
+                </form>
+                <div class="progress mt-3" style="display: none;">
+                    <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                </div>
+                <div id="generationStatus" class="mt-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="generatePDFsButton">Generate PDFs</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -233,14 +295,18 @@
         }
     }
 
+    // Add new JavaScript for finalization functionality
     async function generatePreview() {
         document.getElementById('previewButton').disabled = true;
-        document.getElementById('previewButton').textContent = "Preview...";
+        document.getElementById('previewButton').textContent = "Generating...";
 
         try {
             const response = await fetch('/api/generate-preview/', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
                 body: JSON.stringify({
                     template_content: templateContent,
                     campaign_ids: campaignIds,
@@ -253,13 +319,70 @@
             const blob = await response.blob();
             const url = URL.createObjectURL(blob);
             document.getElementById('previewFrame').src = url;
+
+            // Show finalize button after successful preview
+            document.getElementById('finalizeButton').style.display = 'block';
         } catch (error) {
             console.error('Error:', error);
             alert("Failed to generate preview.");
         } finally {
             document.getElementById('previewButton').disabled = false;
+            document.getElementById('previewButton').textContent = "Generate Preview";
         }
     }
+
+    // Initialize modal
+    const finalizeModal = new bootstrap.Modal(document.getElementById('finalizeModal'));
+
+    // Finalize button click handler
+    document.getElementById('finalizeButton').addEventListener('click', () => {
+        finalizeModal.show();
+    });
+
+    // Generate PDFs button click handler
+    document.getElementById('generatePDFsButton').addEventListener('click', async function () {
+        const selectedGroups = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'))
+            .map(cb => cb.value);
+
+        if (selectedGroups.length === 0) {
+            alert('Please select at least one subscriber group');
+            return;
+        }
+
+        this.disabled = true;
+        document.querySelector('.progress').style.display = 'block';
+        const statusDiv = document.getElementById('generationStatus');
+
+        try {
+            const response = await fetch('/api/generate-subscriber-pdfs/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    template_content: templateContent,
+                    campaign_ids: campaignIds,
+                    newsletter_id: '{{ newsletter.newsletter_id }}',
+                    subscriber_groups: selectedGroups
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                statusDiv.innerHTML = `Successfully generated ${result.generated_count} PDFs`;
+                setTimeout(() => finalizeModal.hide(), 2000);
+            } else {
+                throw new Error(result.message);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            statusDiv.innerHTML = `Error: ${error.message}`;
+        } finally {
+            this.disabled = false;
+        }
+    });
 
     function getCookie(name) {
         let cookieValue = null;

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Brand Dashboard - {{ brand.name }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+
+  <style>
+    body {
+      background-color: #f8f9fa;
+    }
+
+    .header {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      border: 1px solid #DEE2E6;
+      text-align: center;
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 30px;
+    }
+
+    .details-card {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      border: 1px solid #DEE2E6;
+      margin-bottom: 20px;
+    }
+
+    .qr-container {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      border: 1px solid #DEE2E6;
+      text-align: center;
+      width: 100%;
+      max-width: 400px;
+      margin: auto;
+      display: none;
+    }
+
+    #qr-reader {
+      width: 100%;
+      max-width: 350px;
+      margin: auto;
+    }
+
+    .qr-input,
+    .bill-input {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- CSRF Token (Hidden Input) -->
+  <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark py-3 px-3">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">Dashboard</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item me-3">
+            <a class="nav-link active" href="#"><i class="bi bi-house-door me-2"></i>Overview</a>
+          </li>
+          <li class="nav-item me-3">
+            <a class="nav-link" href="{% url 'brand_analytics' brand.brand_id %}"><i class="bi bi-graph-up-arrow me-2"></i>Analytics</a>
+          </li>
+          <li class="nav-item me-3">
+            <a class="nav-link" href="{% url 'brand_login' %}"><i class="bi bi-box-arrow-right me-2"></i>Logout</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="container mt-4">
+    <div class="header">Welcome, {{ brand.name }}!</div>
+
+    <!-- Brand Details -->
+    <div class="details-card">
+      <div class="row">
+        <div class="col-md-6">
+          <p><strong>Brand Name:</strong> {{ brand.name }}</p>
+          <p><strong>Brand ID:</strong> {{ brand.brand_id }}</p>
+          <p><strong>Email:</strong> {{ brand.email }}</p>
+        </div>
+        <div class="col-md-6">
+          <p><strong>Phone Number:</strong> {{ brand.phone }}</p>
+          <p><strong>Address:</strong> {{ brand.address }}</p>
+          <p><strong>Account created on:</strong> {{ brand.created_at|date:"F d, Y" }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- QR Scanner Container -->
+    <div class="qr-container mt-3" id="qr-container">
+      <h5>Scan QR Code</h5>
+      <div id="qr-reader"></div>
+      <!-- QR Code Content (read-only) -->
+      <input type="text" id="qr-input" class="form-control qr-input" placeholder="Scanned code will appear here" readonly>
+      <!-- Bill Amount Input -->
+      <input type="number" id="bill-amount" class="form-control bill-input" placeholder="Enter Bill Amount" step="0.01" min="0">
+    </div>
+
+    <!-- Scan & Validate Button -->
+    <div class="text-center mt-3">
+      <button id="scan-btn" class="btn btn-primary" onclick="startQRScanner()">
+        <i class="bi bi-qr-code-scan me-2"></i> Scan & Verify
+      </button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+  <script>
+    function startQRScanner() {
+      document.getElementById("qr-container").style.display = "block";
+      let scanButton = document.getElementById("scan-btn");
+
+      let html5QrCode = new Html5Qrcode("qr-reader");
+
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        (decodedText) => {
+          document.getElementById("qr-input").value = decodedText;
+
+          // Change button text & styling for Validate action
+          scanButton.innerHTML = '<i class="bi bi-check-circle me-2"></i> Validate';
+          scanButton.classList.remove("btn-primary");
+          scanButton.classList.add("btn-success");
+          // Change the button's ID to distinguish it as the validate button
+          scanButton.setAttribute("id", "validate-btn");
+
+          // Stop scanning
+          html5QrCode.stop();
+
+          // Attach click event to the new validate button (trigger only once)
+          document.getElementById("validate-btn").addEventListener("click", function () {
+            // Get bill amount value
+            let billAmount = document.getElementById("bill-amount").value;
+            // Call validation with both QR content and bill amount
+            validateCoupon(decodedText, billAmount);
+          }, { once: true });
+        },
+        (errorMessage) => { }
+      ).catch((err) => console.log(err));
+    }
+
+    async function validateCoupon(qrContent, billAmount) {
+      try {
+        const csrftoken = getCSRFToken();
+        const brandId = "{{ brand.brand_id }}";
+
+        const response = await fetch(`/validate-coupon/${brandId}/`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrftoken
+          },
+          body: JSON.stringify({
+            qr_content: qrContent,
+            bill_amount: billAmount
+          })
+        });
+
+        const data = await response.json();
+        alert(data.message);
+      } catch (err) {
+        console.log(err);
+        alert("An error occurred during validation.");
+      } finally {
+        // Reload the page to reset the QR scanner functionality
+        window.location.reload();
+      }
+    }
+
+    // Function to get CSRF token from cookies
+    function getCSRFToken() {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.startsWith('csrftoken=')) {
+            cookieValue = cookie.substring('csrftoken='.length, cookie.length);
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+  </script>
+</body>
+
+</html>

@@ -88,6 +88,7 @@
             display: inline-block;
             font-weight: normal;
             margin: 15px 0;
+            transition: background-color 0.2s;
         }
 
         .redeem-button:hover {
@@ -111,6 +112,13 @@
             margin-bottom: 10px;
         }
 
+        .tracking-id {
+            font-size: 11px;
+            color: #999;
+            margin-top: 5px;
+            text-align: right;
+        }
+
         .rupee-symbol {
             font-family: Arial, sans-serif;
         }
@@ -131,7 +139,7 @@
                     <span class="condition-item">{{applicable_days_1}}</span>
                 </div>
             </div>
-            <a href="http://127.0.0.1:8000/redeem/{{unique_id}}" class="redeem-button">Redeem Now</a>
+            <a href="{{tracking_link_1}}" class="redeem-button" target="_blank">Redeem Now</a>
             <div class="footer-details">
                 <span>Valid until: {{expiry_date_1}}</span>
                 <span>Terms & Conditions Apply</span>
@@ -151,7 +159,7 @@
                     <span class="condition-item">{{applicable_days_2}}</span>
                 </div>
             </div>
-            <a href="http://127.0.0.1:8000/redeem/{{unique_id}}" class="redeem-button">Redeem Now</a>
+            <a href="{{tracking_link_2}}" class="redeem-button" target="_blank">Redeem Now</a>
             <div class="footer-details">
                 <span>Valid until: {{expiry_date_2}}</span>
                 <span>Terms & Conditions Apply</span>

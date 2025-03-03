@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+
+    .header {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #DEE2E6;
+        text-align: center;
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 30px;
+    }
+
+    .newsletter-info {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #DEE2E6;
+        margin-bottom: 20px;
+    }
+
+    .template-section {
+        margin-bottom: 20px;
+    }
+
+    .preview-section {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #DEE2E6;
+    }
+
+    .placeholder-counter {
+        font-size: 14px;
+        color: #666;
+        margin: 10px 0;
+    }
+</style>
+
+<div class="container mt-4">
+    <!-- Header -->
+    <div class="header">Coupon Details</div>
+
+    <!-- Coupon Information -->
+    <div class="newsletter-info">
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Coupon ID:</strong> {{ coupon.coupon_id }}</p>
+                <p><strong>Type:</strong> {{ coupon.coupon_type }}</p>
+                {% if coupon.flat_discount %}
+                <p><strong>Flat Discount:</strong> ₹{{ coupon.flat_discount }}</p>
+                {% elif coupon.percentage_discount %}
+                <p><strong>Percentage Discount:</strong> {{ coupon.percentage_discount }}%</p>
+                {% endif %}
+                {% if coupon.bill_count %}
+                <p><strong>Minimum Bill Count:</strong> ₹{{ coupon.bill_count }}</p>
+                {% endif %}
+            </div>
+            <div class="col-md-6">
+                {% if coupon.buy_x and coupon.get_y %}
+                <p><strong>Offer:</strong> Buy {{ coupon.buy_x }}, Get {{ coupon.get_y }}</p>
+                {% endif %}
+                <p><strong>Valid Days:</strong> {{ coupon.coupon_days }}</p>
+                {% if coupon.expiration_date %}
+                <p><strong>Expires On:</strong> {{ coupon.expiration_date }}</p>
+                {% endif %}
+                {% if coupon.campaign %}
+                <p><strong>Associated Campaign:</strong> {{ coupon.campaign.name }} (ID: {{ coupon.campaign.campaign_id }})</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="template-section">
+        <input type="text" id="search" class="form-control" placeholder="Search subscribers...">
+    </div>
+
+    <!-- Subscribers Table -->
+    <table class="table table-bordered table-hover">
+        <thead class="table-light">
+            <tr>
+                <th>Subscriber ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="subscriber-table">
+            {% for tracking in tracking_links %}
+            <tr>
+                <td>{{ tracking.subscriber.subscriber_id }}</td>
+                <td>{{ tracking.subscriber.name }}</td>
+                <td>{{ tracking.subscriber.email }}</td>
+                <td>{{ tracking.subscriber.phone }}</td>
+                <td>
+                    {% if tracking.redeemed %}
+                        <span class="badge bg-success">Redeemed</span>
+                    {% else %}
+                        <span class="badge bg-info">Not Redeemed</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" class="text-center">No subscribers found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    // Live search function
+    document.getElementById("search").addEventListener("keyup", function () {
+        let filter = this.value.toLowerCase();
+        let rows = document.querySelectorAll("#subscriber-table tr");
+        rows.forEach(row => {
+            let name = row.cells[1].textContent.toLowerCase();
+            let email = row.cells[2].textContent.toLowerCase();
+            let phone = row.cells[3].textContent.toLowerCase();
+            row.style.display = (name.includes(filter) || email.includes(filter) || phone.includes(filter)) ? "" : "none";
+        });
+    });
+</script>
+
+{% endblock %}

@@ -1,5 +1,8 @@
-import os, json, qrcode, base64, uuid, hashlib, time, re
+import os, json, qrcode, base64, uuid, hashlib, time, re, random
+from django.utils.timezone import now
 from django.conf import settings
+from django.core.mail import send_mail
+from django.contrib import messages
 import pdfkit
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.timezone import localtime
@@ -16,6 +19,7 @@ from bs4 import BeautifulSoup
 from reportlab.pdfgen import canvas
 from django.views.decorators.csrf import ensure_csrf_cookie
 from weasyprint import HTML
+from django.core.cache import cache
 import json
 import asyncio
 from asgiref.sync import sync_to_async
@@ -200,20 +204,14 @@ def update_subscriber_group(request):
 
     return JsonResponse({"error": "Invalid request"}, status=400)
 
-
-from django.http import JsonResponse
-from django.utils.timezone import localtime
-from django.db.models import Q
-
 def get_campaigns(request):
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        # Get query params
         query = request.GET.get('query', '')
         start_date = request.GET.get('start_date', '')
         end_date = request.GET.get('end_date', '')
         brand_id = request.GET.get('brand_id', '')
 
-        campaigns = Campaign.objects.all().select_related('brand').prefetch_related('coupons')  # Optimize queries
+        campaigns = Campaign.objects.all().select_related('brand').prefetch_related('coupons')
 
         if brand_id:
             campaigns = campaigns.filter(brand__brand_id=brand_id)
@@ -231,7 +229,7 @@ def get_campaigns(request):
                 "campaign_id": campaign.campaign_id,
                 "name": campaign.name,
                 "created_at": localtime(campaign.created_at).strftime("%d-%m-%Y"),
-                "coupon_id": campaign.coupons.first().coupon_id if campaign.coupons.exists() else None,  # Fetch coupon_id
+                "coupon_id": campaign.coupons.first().coupon_id if campaign.coupons.exists() else None,
                 "brand": campaign.brand.name if campaign.brand else "N/A",
                 "brand_id": campaign.brand.id if campaign.brand else None,
             }
@@ -242,6 +240,46 @@ def get_campaigns(request):
 
     return JsonResponse({"error": "Invalid request."}, status=400)
 
+
+def campaigns(request):
+    query = request.GET.get("query", "").strip()
+    start_date = request.GET.get("start_date")
+    end_date = request.GET.get("end_date")
+    brand_id = request.GET.get("brand_id")
+
+    campaigns_data = Campaign.objects.select_related("brand").prefetch_related("coupons").all()
+
+    if query:
+        campaigns_data = campaigns_data.filter(
+            Q(name__icontains=query) | Q(campaign_id__icontains=query)
+        )
+
+    if start_date and end_date:
+        campaigns_data = campaigns_data.filter(created_at__date__range=[start_date, end_date])
+
+    if brand_id:
+        campaigns_data = campaigns_data.filter(brand__id=brand_id)
+
+    campaigns_list = []
+    for campaign in campaigns_data:
+        coupon = campaign.coupons.first()
+        newsletter = Newsletter.objects.filter(placeholders__icontains=campaign.campaign_id).first()
+
+        campaigns_list.append({
+            "campaign_id": campaign.campaign_id,
+            "name": campaign.name,
+            "created_at": campaign.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "brand_id": campaign.brand.brand_id,
+            "brand_name": campaign.brand.name,
+            "coupon_id": coupon.coupon_id if coupon else "N/A",
+            "newsletter_id": newsletter.newsletter_id if newsletter else "N/A",
+        })
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return JsonResponse(campaigns_list, safe=False)
+
+    return render(request, "campaigns.html", {"campaigns": campaigns_list})
+    
 
 def get_subscriber_base(campaign):
     newsletter = Newsletter.objects.filter(campaign=campaign).first()
@@ -346,11 +384,54 @@ def get_coupons(request, newsletter_id):
         ]
 
         return JsonResponse(data, safe=False)
+    
+def coupons(request):
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        query = request.GET.get('query', '').strip()
+        start_date = request.GET.get('start_date', '')
+        end_date = request.GET.get('end_date', '')
 
-def coupons_list(request, newsletter_id):
-    newsletter = get_object_or_404(Newsletter, newsletter_id=newsletter_id)
-    coupons = Coupon.objects.filter(newsletter=newsletter)
-    return render(request, "coupons.html", {"newsletter": newsletter, "coupons": coupons})
+        coupons = Coupon.objects.select_related("campaign__brand").all()
+
+        if query:
+            coupons = coupons.filter(
+                Q(coupon_id__icontains=query) |
+                Q(campaign__campaign_id__icontains=query) | 
+                Q(campaign__brand__name__icontains=query) | 
+                Q(coupon_type__icontains=query)
+            )
+
+        if start_date:
+            coupons = coupons.filter(created_at__date__gte=start_date)
+        if end_date:
+            coupons = coupons.filter(created_at__date__lte=end_date)
+
+        data = []
+        for coupon in coupons:
+            data.append({
+                "coupon_id": coupon.coupon_id,
+                "created_at": coupon.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                "coupon_type": coupon.coupon_type,
+                "bill_count": coupon.bill_count,
+                "expiration_date": coupon.expiration_date.strftime("%Y-%m-%d") if coupon.expiration_date else None,
+                "campaign_id": coupon.campaign.campaign_id if coupon.campaign else None,
+                "brand_name": coupon.campaign.brand.name if coupon.campaign and coupon.campaign.brand else None
+            })
+
+        return JsonResponse(data, safe=False)
+
+    coupons = Coupon.objects.select_related("campaign__brand").all()
+    return render(request, "coupons.html", {"coupons": coupons})
+
+def coupon_detail(request, coupon_id):
+    coupon = get_object_or_404(Coupon, coupon_id=coupon_id)
+    tracking_links = TrackingLink.objects.filter(coupon=coupon).select_related('subscriber')
+
+    return render(request, "coupon_detail.html", {
+        "coupon": coupon,
+        "tracking_links": tracking_links
+    })
+
 
 def create_coupon(request, campaign_id):
     print(f"Campaign ID received: {campaign_id}")
@@ -532,3 +613,328 @@ def generate_preview(request):
             return JsonResponse({'status': 'error', 'message': str(e)})
 
     return JsonResponse({'status': 'error', 'message': 'Invalid request'})
+
+
+def generate_unique_tracking_id(subscriber_id, campaign_id, coupon_id):
+    """Generate a 12-digit unique tracking ID"""
+    # Mix parts of each ID and add random characters
+    base = f"{subscriber_id[:2]}{campaign_id[:2]}{coupon_id[:2]}"
+    random_part = uuid.uuid4().hex[:6].upper()
+    return f"{base}{random_part}"
+
+@csrf_exempt
+def generate_subscriber_pdfs(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            template_content = data['template_content']
+            campaign_ids = data['campaign_ids']
+            newsletter_id = data['newsletter_id']
+            subscriber_groups = data['subscriber_groups']
+
+            newsletter = get_object_or_404(Newsletter, newsletter_id=newsletter_id)
+            
+            # Get all subscribers from selected groups
+            subscribers = Subscriber.objects.filter(group__in=subscriber_groups)
+            
+            # Create PDF directory if it doesn't exist
+            pdf_dir = os.path.join(settings.MEDIA_ROOT, 'newsletters', newsletter_id)
+            os.makedirs(pdf_dir, exist_ok=True)
+
+            generated_count = 0
+            template = Template(template_content)
+
+            for subscriber in subscribers:
+                context = {}
+                
+                # Add subscriber-specific information
+                context['subscriber_name'] = subscriber.name
+                
+                # Process each campaign
+                for index, campaign_id in enumerate(campaign_ids, 1):
+                    campaign = Campaign.objects.get(campaign_id=campaign_id)
+                    brand = campaign.brand
+                    coupon = campaign.coupons.first()
+
+                    if coupon:
+                        # Generate unique tracking ID and link
+                        tracking_id = generate_unique_tracking_id(
+                            subscriber.subscriber_id,
+                            campaign_id,
+                            coupon.coupon_id
+                        )
+                        
+                        # Create tracking link
+                        tracking_link = TrackingLink.objects.create(
+                            coupon=coupon,
+                            subscriber=subscriber,
+                            unique_id=tracking_id,
+                            tracking_link=f"{settings.REDEEM_LINK}/{tracking_id}"
+                        )
+
+                        # Add campaign-specific context
+                        offer_text = ""
+                        coupon_category = "Special Offer"
+
+                        if coupon.coupon_type == "Buy X Get Y":
+                            offer_text = f"Buy {coupon.buy_x} Get {coupon.get_y}"
+                        elif coupon.coupon_type == "Percentage Discount":
+                            offer_text = f"{coupon.percentage_discount}% OFF"
+                            coupon_category = "Discount"
+                        elif coupon.coupon_type == "Flat Discount":
+                            offer_text = f"₹{coupon.flat_discount} OFF"
+                            coupon_category = "Discount"
+                        else:
+                            offer_text = coupon.custom_coupon_type or coupon.coupon_type
+
+                        context.update({
+                            f'campaign_id_{index}': campaign_id,
+                            f'brand_name_{index}': brand.name,
+                            f'coupon_type_{index}': coupon_category,
+                            f'offer_{index}': offer_text,
+                            f'min_purchase_{index}': f"Min. Bill: ₹{coupon.bill_count}" if coupon.bill_count > 0 else "No minimum purchase required",
+                            f'applicable_days_{index}': "Valid: " + coupon.coupon_days,
+                            f'expiry_date_{index}': coupon.expiration_date.strftime('%B %d, %Y') if coupon.expiration_date else 'No expiry date',
+                            f'tracking_link_{index}': tracking_link.tracking_link,
+                            f'unique_id_{index}': tracking_id
+                        })
+
+                # Generate PDF for subscriber
+                rendered_html = template.render(Context(context))
+                pdf_filename = f"{subscriber.subscriber_id}_{newsletter_id}.pdf"
+                pdf_path = os.path.join(pdf_dir, pdf_filename)
+                
+                pdf = pdfkit.from_string(rendered_html, pdf_path)
+                generated_count += 1
+
+            # Update newsletter status
+            newsletter.is_frozen = True
+            newsletter.placeholders = ','.join(campaign_ids)
+            newsletter.save()
+
+            return JsonResponse({
+                'status': 'success',
+                'generated_count': generated_count,
+                'message': f'Successfully generated {generated_count} PDFs'
+            })
+
+        except Exception as e:
+            return JsonResponse({
+                'status': 'error',
+                'message': str(e)
+            })
+
+    return JsonResponse({
+        'status': 'error',
+        'message': 'Invalid request method'
+    })
+
+
+def redeem_coupon(request, tracking_id):
+    # Get tracking link or return 404
+    tracking_link = get_object_or_404(TrackingLink, unique_id=tracking_id)
+    
+    # Update clicked status if not already clicked
+    if not tracking_link.clicked:
+        tracking_link.clicked = True
+        # tracking_link.clicked_at = timezone.now()
+        tracking_link.save()
+
+    # Get related objects
+    subscriber = tracking_link.subscriber
+    coupon = tracking_link.coupon
+
+    # Generate QR code containing the tracking ID
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(tracking_id)
+    qr.make(fit=True)
+
+    # Create QR code image
+    qr_image = qr.make_image(fill_color="black", back_color="white")
+    
+    # Convert QR code to base64 for embedding in HTML
+    buffer = BytesIO()
+    qr_image.save(buffer, format="PNG")
+    qr_base64 = base64.b64encode(buffer.getvalue()).decode()
+
+    context = {
+        'subscriber': subscriber,
+        'coupon': coupon,
+        'qr_base64': qr_base64,
+        'tracking_id': tracking_id
+    }
+    
+    return render(request, 'redeem_coupon.html', context)
+
+############################################## Brand Login
+
+def generate_otp():
+    return str(random.randint(100000, 999999))
+
+# Option 1: Email OTP (Completely Free)
+def send_email_otp(email, otp):
+    try:
+        subject = 'Your Login OTP'
+        message = f'Your OTP for login is: {otp}'
+        from_email = settings.EMAIL_HOST_USER
+        recipient_list = [email]
+        
+        send_mail(subject, message, from_email, recipient_list)
+        return True
+    except Exception as e:
+        print(f"Error sending email: {e}")
+        return False
+    
+
+def brand_login(request):
+    if request.method == 'POST':
+        brand_id = request.POST.get('brand_id')
+        try:
+            brand = Brand.objects.get(brand_id=brand_id)
+            otp = generate_otp()
+            cache.set(f'brand_otp_{brand_id}', otp, 300)
+            
+            if send_email_otp(brand.email, otp):
+                request.session['brand_id'] = brand_id
+                messages.success(request, 'OTP has been sent to your registered email.')
+                return redirect('verify_otp')
+            
+            else:
+                messages.error(request, 'Failed to send OTP. Please try again.')
+        except Brand.DoesNotExist:
+            messages.error(request, 'Invalid Brand ID.')
+    
+    return render(request, 'brands/brand_login.html')
+
+def verify_otp(request):
+    brand_id = request.session.get('brand_id')
+    if not brand_id:
+        return redirect('brand_login')
+    
+    if request.method == 'POST':
+        entered_otp = request.POST.get('otp')
+        stored_otp = cache.get(f'brand_otp_{brand_id}')
+        
+        if stored_otp and entered_otp == stored_otp:
+            cache.delete(f'brand_otp_{brand_id}')
+            del request.session['brand_id']
+            return redirect(f'/brand/dashboard/{brand_id}')
+        else:
+            messages.error(request, 'Invalid OTP. Please try again.')
+    
+    return render(request, 'brands/verify_otp.html')
+
+
+def brand_dashboard(request, brand_id):
+    # Get the brand or return 404
+    brand = get_object_or_404(Brand, brand_id=brand_id)
+    
+    context = {
+        'brand': brand,
+        # Add any additional context data you want to display
+    }
+    return render(request, 'brands/brand_dashboard.html', context)
+
+
+###################### Coupon Validation
+
+def validate_coupon(request, brand_id):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            scanned_qr_content = data.get("qr_content")  # Unique tracking ID
+            bill_amount = data.get("bill_amount")  # Bill amount from the form
+
+            tracking = get_object_or_404(TrackingLink, unique_id=scanned_qr_content)
+            coupon = tracking.coupon
+            subscriber = tracking.subscriber
+
+            expected_brand_id = str(coupon.campaign.brand.brand_id).strip()
+            actual_brand_id = str(brand_id).strip()
+
+            if expected_brand_id != actual_brand_id:
+                return JsonResponse({
+                    "status": "error", 
+                    "message": f"Unauthorized brand access. Expected {expected_brand_id}, got {actual_brand_id}"
+                }, status=403)
+
+            if coupon.is_expired():
+                return JsonResponse({"status": "error", "message": "Coupon has expired."}, status=400)
+
+            if not coupon.is_valid_today():
+                return JsonResponse({"status": "error", "message": "Coupon is not valid today."}, status=400)
+
+            if tracking.redeemed:
+                return JsonResponse({"status": "error", "message": "Coupon already redeemed."}, status=400)
+
+            # Check if bill amount is provided and valid
+            if bill_amount is None or bill_amount == "":
+                return JsonResponse({"status": "error", "message": "Bill amount is required."}, status=400)
+            
+            try:
+                # Convert bill_amount to a float for comparison
+                bill_amount_val = float(bill_amount)
+            except ValueError:
+                return JsonResponse({"status": "error", "message": "Invalid bill amount."}, status=400)
+
+            # Compare bill amount with coupon.bill_count (assumed as minimum required amount)
+            if bill_amount_val < coupon.bill_count:
+                return JsonResponse({
+                    "status": "error",
+                    "message": f"Bill amount {bill_amount_val} is less than the required minimum of {coupon.bill_count}."
+                }, status=400)
+
+            # Save the bill amount if valid
+            tracking.bill_amount = bill_amount_val
+            tracking.redeemed = True
+            tracking.redeemed_at = now()
+            tracking.save()
+
+            return JsonResponse({
+                "status": "success",
+                "message": f"Coupon successfully redeemed for {subscriber.name}.",
+                "subscriber_id": subscriber.subscriber_id,
+                "redeemed_at": tracking.redeemed_at.strftime("%Y-%m-%d %H:%M:%S"),
+            })
+
+        except Exception as e:
+            return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+    return JsonResponse({"status": "error", "message": "Invalid request"}, status=400)
+
+
+################# Analytics
+
+def brand_analytics(request, brand_id):
+    # Get the brand; ensure the user is logged in (or use a decorator if necessary)
+    brand = get_object_or_404(Brand, brand_id=brand_id)
+    
+    # Get redeemed tracking links for the brand
+    redemptions = TrackingLink.objects.filter(
+        coupon__campaign__brand=brand, redeemed=True
+    ).select_related('coupon', 'subscriber').order_by('-redeemed_at')
+    
+    # Prepare chart data: count redemptions per day
+    redemptions_by_date = {}
+    for redemption in redemptions:
+        # Format the date (e.g., "2023-01-01")
+        date_str = redemption.redeemed_at.strftime("%Y-%m-%d")
+        redemptions_by_date[date_str] = redemptions_by_date.get(date_str, 0) + 1
+
+    # Sort the dates chronologically and prepare labels and data arrays
+    labels = sorted(redemptions_by_date.keys())
+    data = [redemptions_by_date[label] for label in labels]
+    redemptions_data = json.dumps({"labels": labels, "data": data})
+    
+    context = {
+        'brand': brand,
+        'redemptions': redemptions,
+        'redemptions_data': redemptions_data,
+    }
+    return render(request, 'brands/analytics.html', context)
+
