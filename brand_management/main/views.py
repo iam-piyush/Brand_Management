@@ -1,9 +1,12 @@
-import os, json, qrcode, base64, uuid, hashlib, time, re, random
+import os, json, qrcode, base64, uuid, hashlib, time, re, random, requests
 from django.utils.timezone import now
 from django.conf import settings
 from django.core.mail import send_mail
 from django.contrib import messages
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required, user_passes_test
 import pdfkit
+from django.core.mail import EmailMessage
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.timezone import localtime
 from django.db.models import Q
@@ -19,6 +22,7 @@ from bs4 import BeautifulSoup
 from reportlab.pdfgen import canvas
 from django.views.decorators.csrf import ensure_csrf_cookie
 from weasyprint import HTML
+from django.contrib.auth.models import User
 from django.core.cache import cache
 import json
 import asyncio
@@ -27,12 +31,39 @@ from django.template import Template, Context
 import tempfile
 import zipfile
 
+# Helper function to check if user is admin
+def is_admin(user):
+    return user.is_staff 
+
+
+# Admin login
+def admin_login(request):
+    if request.method == "POST":
+        username = request.POST["username"]
+        password = request.POST["password"]
+        user = authenticate(request, username=username, password=password)
+        if user and user.is_staff:
+            login(request, user)
+            return redirect("brands")
+        else:
+            return render(request, "admin_login.html", {"error": "Invalid credentials"})
+    return render(request, "admin_login.html")
+
+# Admin logout
+@login_required
+def admin_logout(request):
+    logout(request)
+    return redirect("login")
+
 def home(request):
     return render(request, 'base.html')
 
+
+@user_passes_test(is_admin)
 def brands(request):
     return render(request, 'brands.html')
 
+@user_passes_test(is_admin)
 def get_brands(request):
     query = request.GET.get('query', '')
     start_date = request.GET.get('start_date', '')
@@ -62,6 +93,8 @@ def get_brands(request):
 
     return JsonResponse(data, safe=False)
 
+
+@user_passes_test(is_admin)
 def create_brand(request):
     if request.method == "POST":
         form = BrandForm(request.POST)
@@ -82,6 +115,8 @@ def create_brand(request):
             return JsonResponse({"error": "Invalid form data", "details": form.errors}, status=400)
     return JsonResponse({"error": "Invalid request"}, status=400)
 
+
+@user_passes_test(is_admin)
 def brand_detail(request, brand_id):
     brand = get_object_or_404(Brand, brand_id=brand_id)
     campaigns = Campaign.objects.filter(brand=brand)
@@ -111,12 +146,14 @@ def subscribe(request):
 def subscription_success(request):
     return render(request, 'subscription_success.html')
 
+
+@user_passes_test(is_admin)
 def newsletter_list(request):
     newsletters = Newsletter.objects.all()
     campaigns = Campaign.objects.all()
     return render(request, "newsletters.html", {"newsletters": newsletters, "campaigns": campaigns})
 
-   
+@user_passes_test(is_admin)  
 def search_campaigns(request):
     query = request.GET.get("query", "").strip()
 
@@ -126,7 +163,7 @@ def search_campaigns(request):
         "campaigns": [{"campaign_id": c.campaign_id, "name": c.name} for c in campaigns]
     })
 
-
+@user_passes_test(is_admin)
 def create_campaign(request, brand_id):
     if request.method == "POST":
         brand = get_object_or_404(Brand, brand_id=brand_id)
@@ -150,7 +187,7 @@ def create_campaign(request, brand_id):
 
     return JsonResponse({"error": "Invalid request"}, status=400)
 
-
+@user_passes_test(is_admin)
 def get_subscribers(request):
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         query = request.GET.get('query', '')
@@ -189,6 +226,7 @@ def get_subscribers(request):
 
 
 @csrf_exempt
+@user_passes_test(is_admin)
 def update_subscriber_group(request):
     if request.method == "POST":
         subscriber_id = request.POST.get("subscriber_id")
@@ -204,6 +242,8 @@ def update_subscriber_group(request):
 
     return JsonResponse({"error": "Invalid request"}, status=400)
 
+
+@user_passes_test(is_admin)
 def get_campaigns(request):
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         query = request.GET.get('query', '')
@@ -241,6 +281,7 @@ def get_campaigns(request):
     return JsonResponse({"error": "Invalid request."}, status=400)
 
 
+@user_passes_test(is_admin)
 def campaigns(request):
     query = request.GET.get("query", "").strip()
     start_date = request.GET.get("start_date")
@@ -281,11 +322,13 @@ def campaigns(request):
     return render(request, "campaigns.html", {"campaigns": campaigns_list})
     
 
+@user_passes_test(is_admin)
 def get_subscriber_base(campaign):
     newsletter = Newsletter.objects.filter(campaign=campaign).first()
     return newsletter.subscriber_base if newsletter else ""
 
 
+@user_passes_test(is_admin)
 def get_newsletters(request):
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         query = request.GET.get('query', '')
@@ -325,6 +368,7 @@ def get_newsletters(request):
     newsletters = Newsletter.objects.all()
     return render(request, "newsletters.html", {"newsletters": newsletters, "brands": brands})
 
+@user_passes_test(is_admin)
 def newsletter_detail(request, newsletter_id):
     newsletter = get_object_or_404(Newsletter, newsletter_id=newsletter_id)
     
@@ -351,6 +395,7 @@ def newsletter_detail(request, newsletter_id):
     
     return render(request, 'newsletter_detail.html', context)
 
+@user_passes_test(is_admin)
 def get_coupons(request, newsletter_id):
     """Fetch and filter coupons dynamically via AJAX request."""
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -384,7 +429,8 @@ def get_coupons(request, newsletter_id):
         ]
 
         return JsonResponse(data, safe=False)
-    
+
+@user_passes_test(is_admin)
 def coupons(request):
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
         query = request.GET.get('query', '').strip()
@@ -423,6 +469,7 @@ def coupons(request):
     coupons = Coupon.objects.select_related("campaign__brand").all()
     return render(request, "coupons.html", {"coupons": coupons})
 
+@user_passes_test(is_admin)
 def coupon_detail(request, coupon_id):
     coupon = get_object_or_404(Coupon, coupon_id=coupon_id)
     tracking_links = TrackingLink.objects.filter(coupon=coupon).select_related('subscriber')
@@ -433,6 +480,7 @@ def coupon_detail(request, coupon_id):
     })
 
 
+@user_passes_test(is_admin)
 def create_coupon(request, campaign_id):
     print(f"Campaign ID received: {campaign_id}")
     print(f"Request body: {request.body}")
@@ -502,12 +550,13 @@ def create_coupon(request, campaign_id):
 
 
 
-
+@user_passes_test(is_admin)
 def newsletter_list(request):
     newsletters = Newsletter.objects.all().order_by('-created_at')
     return render(request, 'newsletters.html', {'newsletters': newsletters})
 
 @csrf_exempt
+@user_passes_test(is_admin)
 def create_newsletter(request):
     if request.method == 'POST':
         data = json.loads(request.body)
@@ -526,11 +575,13 @@ def create_newsletter(request):
 
 
 @csrf_exempt
+@user_passes_test(is_admin)
 def process_template(request):
     if request.method == 'POST' and request.FILES.get('template'):
         try:
             template_file = request.FILES['template']
             template_content = template_file.read().decode('utf-8')
+            
             
             return JsonResponse({
                 'status': 'success',
@@ -541,6 +592,7 @@ def process_template(request):
     return JsonResponse({'status': 'error', 'message': 'Invalid request'})
 
 @csrf_exempt
+@user_passes_test(is_admin)
 def generate_preview(request):
     if request.method == 'POST':
         try:
@@ -633,11 +685,15 @@ def generate_subscriber_pdfs(request):
             subscriber_groups = data['subscriber_groups']
 
             newsletter = get_object_or_404(Newsletter, newsletter_id=newsletter_id)
-            
-            # Get all subscribers from selected groups
+
+            # Store campaign IDs in the placeholders column
+            newsletter.template_content = template_content  
+            newsletter.subscriber_base = ','.join(subscriber_groups)
+            newsletter.placeholders = ','.join(campaign_ids)  # <-- Saving campaign_ids in placeholders
+            newsletter.save()
+
             subscribers = Subscriber.objects.filter(group__in=subscriber_groups)
             
-            # Create PDF directory if it doesn't exist
             pdf_dir = os.path.join(settings.MEDIA_ROOT, 'newsletters', newsletter_id)
             os.makedirs(pdf_dir, exist_ok=True)
 
@@ -646,18 +702,15 @@ def generate_subscriber_pdfs(request):
 
             for subscriber in subscribers:
                 context = {}
-                
-                # Add subscriber-specific information
+
                 context['subscriber_name'] = subscriber.name
-                
-                # Process each campaign
+
                 for index, campaign_id in enumerate(campaign_ids, 1):
                     campaign = Campaign.objects.get(campaign_id=campaign_id)
                     brand = campaign.brand
                     coupon = campaign.coupons.first()
 
                     if coupon:
-                        # Generate unique tracking ID and link
                         tracking_id = generate_unique_tracking_id(
                             subscriber.subscriber_id,
                             campaign_id,
@@ -707,9 +760,10 @@ def generate_subscriber_pdfs(request):
                 pdf = pdfkit.from_string(rendered_html, pdf_path)
                 generated_count += 1
 
-            # Update newsletter status
+            # Update newsletter status after PDF generation
             newsletter.is_frozen = True
-            newsletter.placeholders = ','.join(campaign_ids)
+            newsletter.pdf_generated = True
+            newsletter.status = True
             newsletter.save()
 
             return JsonResponse({
@@ -728,6 +782,7 @@ def generate_subscriber_pdfs(request):
         'status': 'error',
         'message': 'Invalid request method'
     })
+
 
 
 def redeem_coupon(request, tracking_id):
@@ -776,7 +831,6 @@ def redeem_coupon(request, tracking_id):
 def generate_otp():
     return str(random.randint(100000, 999999))
 
-# Option 1: Email OTP (Completely Free)
 def send_email_otp(email, otp):
     try:
         subject = 'Your Login OTP'
@@ -822,6 +876,11 @@ def verify_otp(request):
         
         if stored_otp and entered_otp == stored_otp:
             cache.delete(f'brand_otp_{brand_id}')
+            brand = get_object_or_404(Brand, brand_id=brand_id)
+
+            user, created = User.objects.get_or_create(username=brand_id, defaults={"email": brand.email})
+            login(request, user)  # Log in the user
+            
             del request.session['brand_id']
             return redirect(f'/brand/dashboard/{brand_id}')
         else:
@@ -830,15 +889,23 @@ def verify_otp(request):
     return render(request, 'brands/verify_otp.html')
 
 
+@login_required(login_url='brand_login')
 def brand_dashboard(request, brand_id):
-    # Get the brand or return 404
+    if request.user.username != brand_id:
+        return redirect('brand_login')
+
     brand = get_object_or_404(Brand, brand_id=brand_id)
     
     context = {
         'brand': brand,
-        # Add any additional context data you want to display
     }
     return render(request, 'brands/brand_dashboard.html', context)
+
+
+def brand_logout(request):
+    logout(request)
+    request.session.flush()
+    return redirect('login')
 
 
 ###################### Coupon Validation
@@ -847,8 +914,8 @@ def validate_coupon(request, brand_id):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            scanned_qr_content = data.get("qr_content")  # Unique tracking ID
-            bill_amount = data.get("bill_amount")  # Bill amount from the form
+            scanned_qr_content = data.get("qr_content")
+            bill_amount = data.get("bill_amount")
 
             tracking = get_object_or_404(TrackingLink, unique_id=scanned_qr_content)
             coupon = tracking.coupon
@@ -911,22 +978,17 @@ def validate_coupon(request, brand_id):
 ################# Analytics
 
 def brand_analytics(request, brand_id):
-    # Get the brand; ensure the user is logged in (or use a decorator if necessary)
     brand = get_object_or_404(Brand, brand_id=brand_id)
     
-    # Get redeemed tracking links for the brand
     redemptions = TrackingLink.objects.filter(
         coupon__campaign__brand=brand, redeemed=True
     ).select_related('coupon', 'subscriber').order_by('-redeemed_at')
     
-    # Prepare chart data: count redemptions per day
     redemptions_by_date = {}
     for redemption in redemptions:
-        # Format the date (e.g., "2023-01-01")
         date_str = redemption.redeemed_at.strftime("%Y-%m-%d")
         redemptions_by_date[date_str] = redemptions_by_date.get(date_str, 0) + 1
 
-    # Sort the dates chronologically and prepare labels and data arrays
     labels = sorted(redemptions_by_date.keys())
     data = [redemptions_by_date[label] for label in labels]
     redemptions_data = json.dumps({"labels": labels, "data": data})
@@ -937,4 +999,60 @@ def brand_analytics(request, brand_id):
         'redemptions_data': redemptions_data,
     }
     return render(request, 'brands/analytics.html', context)
+
+
+
+
+def send_email_with_pdf(subscriber, newsletter):
+    pdf_url = f"{settings.MEDIA_URL}newsletters/{newsletter.newsletter_id}/{subscriber.subscriber_id}_{newsletter.newsletter_id}.pdf"
+    
+    pdf_path = os.path.join(settings.MEDIA_ROOT, f'newsletters/{newsletter.newsletter_id}/{subscriber.subscriber_id}_{newsletter.newsletter_id}.pdf')
+
+    if not os.path.exists(pdf_path):
+        print(f"PDF not found: {pdf_path}")
+        return
+
+    email_subject = f"Newsletter {newsletter.newsletter_id} for {subscriber.name}"
+    email_body = f"Hello {subscriber.name},\n\nPlease find attached the newsletter {newsletter.newsletter_id}.\n\nBest regards,\nDizittal Team"
+
+    email = EmailMessage(
+        email_subject,
+        email_body,
+        settings.DEFAULT_FROM_EMAIL,
+        [subscriber.email]
+    )
+
+    with open(pdf_path, 'rb') as pdf_file:
+        email.attach(f'{subscriber.subscriber_id}_{newsletter.newsletter_id}.pdf', pdf_file.read(), 'application/pdf')
+
+    try:
+        email.send()
+    except Exception as e:
+        print(f"Failed to send email to {subscriber.email}: {str(e)}")
+
+
+def deliver_newsletters(request, newsletter_id):
+    newsletter = get_object_or_404(Newsletter, newsletter_id=newsletter_id)
+    
+    if not newsletter.pdf_generated:
+        messages.error(request, 'PDFs have not been generated yet.')
+        return redirect('newsletter_detail', newsletter_id=newsletter_id)
+
+    subscriber_base = newsletter.subscriber_base
+
+    subscribers = Subscriber.objects.filter(group__in=subscriber_base)
+
+    if not subscribers.exists():
+        messages.error(request, 'No subscribers found for this newsletter.')
+        return redirect('newsletter_detail', newsletter_id=newsletter_id)
+
+    for subscriber in subscribers:
+        send_email_with_pdf(subscriber, newsletter)
+
+    newsletter.pdf_sent = True
+    newsletter.save()
+
+    messages.success(request, f'Newsletter PDFs successfully sent to {subscribers.count()} subscribers.')
+    return redirect('newsletter_detail', newsletter_id=newsletter_id)
+
 

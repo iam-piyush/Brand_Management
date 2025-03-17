@@ -37,13 +37,21 @@ class Newsletter(models.Model):
     name = models.CharField(max_length=200, null=True)
     newsletter_id = models.CharField(max_length=50, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    template_content = models.TextField(null=True, blank=True)
-    placeholders = models.TextField(null=True, blank=True)  # Will store campaign IDs as comma-separated string
+    template_content = models.TextField(blank=True, null=True)
+    status = models.BooleanField(default=False)
+    placeholders = models.TextField(null=True, blank=True)
     is_frozen = models.BooleanField(default=False)
+    pdf_generated = models.BooleanField(default=False)
+    pdf_sent = models.BooleanField(default=False)
+    subscriber_base = models.TextField(null=True, blank=True)
 
     def get_placeholders(self):
         """Returns list of campaign IDs"""
         return self.placeholders.split(',') if self.placeholders else []
+
+    def get_subscriber_base(self):
+        """Returns the subscriber groups as a list"""
+        return self.subscriber_base.split(',') if self.subscriber_base else []
 
     def is_complete(self):
         return bool(self.placeholders and self.placeholders.strip())

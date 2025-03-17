@@ -1,7 +1,13 @@
 from django.urls import path
 from . import views
+from django.contrib.auth import views as auth_views
 
 urlpatterns = [
+    # Admin login/logout
+    path("admin_login/", views.admin_login, name="admin_login"),
+    path("admin_logout/", views.admin_logout, name="admin_logout"),
+    path("accounts/login/", auth_views.LoginView.as_view(template_name="login.html"), name="login"),
+
     # Brand-related URLs
     path("brands/", views.brands, name="brands"),
     path("get_brands/", views.get_brands, name="get_brands"),
@@ -46,4 +52,9 @@ urlpatterns = [
     path('verify_otp/', views.verify_otp, name='verify_otp'),
     path('brand/dashboard/<str:brand_id>/', views.brand_dashboard, name='brand_dashboard'),
     path('brand/analytics/<str:brand_id>/', views.brand_analytics, name='brand_analytics'),
+    path("brand_logout/", views.brand_logout, name="brand_logout"),
+
+
+    path('deliver_newsletters/<str:newsletter_id>/', views.deliver_newsletters, name='deliver_newsletters'),
+
 ]

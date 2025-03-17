@@ -10,7 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
 
     <style>
         body {
@@ -62,15 +62,22 @@
 </head>
 
 <body>
-
     <div class="main-container">
         <div class="sidebar">
+            {% if user.is_authenticated and user.is_staff %}
             <a href="{% url 'brands' %}" class="card-btn">Brands</a>
             <a href="{% url 'campaigns' %}" class="card-btn">Campaigns</a>
             <a href="{% url 'coupons' %}" class="card-btn">Coupons</a>
-            <a href="{% url 'newsletter_list' %}" class="card-btn">Newsletter</a>
+            <a href="{% url 'newsletter_list' %}" class="card-btn">Newsletters</a>
             <a href="{% url 'subscribers' %}" class="card-btn">Subscribers</a>
-            <a href="#" class="card-btn">Admin</a>
+            <a href="{% url 'admin_logout' %}" class="card-btn">Logout</a>
+            {% elif request.session.brand_id %}
+            <a href="{% url 'brand_dashboard' request.session.brand_id %}" class="card-btn">Dashboard</a>
+            <a href="{% url 'brand_login' %}" class="card-btn">Logout</a>
+            {% else %}
+            <a href="{% url 'admin_login' %}" class="card-btn">Admin Login</a>
+            <a href="{% url 'brand_login' %}" class="card-btn">Brand Login</a>
+            {% endif %}
         </div>
 
         <div class="content">
@@ -78,7 +85,6 @@
             {% endblock %}
         </div>
     </div>
-
 </body>
 
 </html>

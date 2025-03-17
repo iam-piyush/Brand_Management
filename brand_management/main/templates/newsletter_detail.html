@@ -73,20 +73,68 @@
     <div class="header">{{ newsletter.name }}</div>
 
     <!-- Newsletter Information -->
-    <div class="newsletter-info">
+    <div class="newsletter-info p-3 border rounded">
         <div class="row">
+            <!-- Left Section -->
             <div class="col-md-6">
                 <p><strong>Newsletter ID:</strong> {{ newsletter.newsletter_id }}</p>
                 <p><strong>Created Date:</strong> {{ newsletter.created_at|date:"F d, Y" }}</p>
+
+                <!-- Campaigns -->
+                <p style="display: none;"><strong>Total Campaigns:</strong> <span id="totalCampaigns">0</span></p>
+
+                <!-- Subscriber Base -->
+                <p><strong>Subscriber Base:</strong>
+                    {% if newsletter.subscriber_base %}
+                    <span class="badge bg-primary">{{ newsletter.subscriber_base }}</span>
+                    {% else %}
+                    <span class="badge bg-secondary">No Subscriber Base Assigned</span>
+                    {% endif %}
+                </p>
             </div>
+
+            <!-- Right Section -->
             <div class="col-md-6">
-                <p><strong>Total Campaigns:</strong> <span id="totalCampaigns">0</span></p>
-                <p><strong>Status:</strong> <span id="templateStatus">No template uploaded</span></p>
+                <p><strong>Template Status:</strong>
+                    {% if newsletter.template_content %}
+                    <span class="badge bg-success">Template Uploaded</span>
+                    {% else %}
+                    <span class="badge bg-danger">No Template Uploaded</span>
+                    {% endif %}
+                </p>
+
+                <p><strong>PDF Status:</strong>
+                    {% if newsletter.pdf_generated %}
+                    <span class="badge bg-success">PDF Generated</span>
+                    {% else %}
+                    <span class="badge bg-danger">PDF Not Generated</span>
+                    {% endif %}
+                </p>
+
+                <p><strong>PDF Sent:</strong>
+                    {% if newsletter.pdf_sent %}
+                    <span class="badge bg-success">PDF Sent</span>
+                    {% elif newsletter.pdf_generated %}
+                    <span class="badge bg-danger">PDF Not Sent</span>
+                <form method="POST" action="{% url 'deliver_newsletters' newsletter.newsletter_id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary">Deliver Newsletters</button>
+                </form>
+                {% else %}
+                <span class="badge bg-secondary">PDF Not Generated</span>
+                {% endif %}
+                </p>
+
+
             </div>
         </div>
     </div>
 
+
+
+
     <!-- Template Upload Section -->
+    {% if not newsletter.template_content %}
     <div class="template-section">
         <form id="templateUploadForm" class="mb-3">
             {% csrf_token %}
@@ -97,6 +145,8 @@
         </form>
         <div id="placeholderCounter" class="placeholder-counter"></div>
     </div>
+    {% endif %}
+
 
     <!-- Campaign ID Inputs -->
     <div id="campaignInputsSection" class="campaign-inputs" style="display: none;">
@@ -207,7 +257,6 @@
                 templateContent = data.template_content;
                 detectedPlaceholders = findCampaignPlaceholders(templateContent);
                 displayCampaignInputs();
-                updateTemplateStatus();
             } else {
                 alert("Failed to process template.");
             }
@@ -219,6 +268,7 @@
             uploadButton.textContent = "Upload Template";
         }
     });
+
 
     function findCampaignPlaceholders(content) {
         const regex = /\{\{campaign_id_(\d+)\}\}/g;
@@ -265,11 +315,6 @@
                 checkAndTriggerPreview();
             });
         });
-    }
-
-    function updateTemplateStatus() {
-        const status = document.getElementById('templateStatus');
-        status.textContent = templateContent ? 'Template uploaded' : 'No template uploaded';
     }
 
     function updateTotalCampaigns() {
@@ -383,6 +428,7 @@
             this.disabled = false;
         }
     });
+
 
     function getCookie(name) {
         let cookieValue = null;
