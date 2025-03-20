@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,7 +15,9 @@
             align-items: center;
             justify-content: center;
             padding: 20px;
+            flex-direction: column;
         }
+
         .container {
             background-color: white;
             border-radius: 15px;
@@ -22,9 +25,11 @@
             padding: 30px;
             max-width: 600px;
         }
+
         .qr-code {
             margin: 30px 0;
         }
+
         .qr-code img {
             width: 250px;
             height: 250px;
@@ -32,22 +37,26 @@
             padding: 10px;
             border-radius: 10px;
         }
+
         .tagline {
             font-style: italic;
             color: #6c757d;
             margin-top: 15px;
         }
+
         h2 {
             color: #007bff;
             font-weight: bold;
             margin-bottom: 25px;
         }
+
         .offer-details {
             background: #f8f9fa;
             padding: 20px;
             border-radius: 10px;
             margin: 20px 0;
         }
+
         .tracking-id {
             font-size: 0.9rem;
             color: #6c757d;
@@ -55,35 +64,45 @@
             padding-top: 20px;
             border-top: 1px solid #dee2e6;
         }
+
         .discount-value {
             font-size: 1.5rem;
             color: #28a745;
             font-weight: bold;
             margin: 15px 0;
         }
+
+        .footer {
+            margin-top: 20px;
+            font-size: 0.9rem;
+            text-align: center;
+            color: #6c757d;
+            padding: 10px 0;
+        }
     </style>
 </head>
+
 <body>
     <div class="container text-center">
         <h2>Welcome, {{ subscriber.name }}!</h2>
-        
+
         <div class="offer-details">
             <div class="discount-value">
                 {% if coupon.flat_discount %}
-                    ₹{{ coupon.flat_discount }} OFF
+                ₹{{ coupon.flat_discount }} OFF
                 {% elif coupon.percentage_discount %}
-                    {{ coupon.percentage_discount }}% OFF
+                {{ coupon.percentage_discount }}% OFF
                 {% elif coupon.buy_x and coupon.get_y %}
-                    Buy {{ coupon.buy_x }} Get {{ coupon.get_y }} Free
+                Buy {{ coupon.buy_x }} Get {{ coupon.get_y }} Free
                 {% else %}
-                    Special Offer!
+                Special Offer!
                 {% endif %}
             </div>
 
             {% if coupon.bill_count > 0 %}
-                <p class="mb-2"><strong>Minimum Bill Amount:</strong> ₹{{ coupon.bill_count }}</p>
+            <p class="mb-2"><strong>Minimum Bill Amount:</strong> ₹{{ coupon.bill_count }}</p>
             {% endif %}
-            
+
             <p class="mb-2"><strong>Valid Days:</strong> {{ coupon.coupon_days }}</p>
             <p class="mb-0"><strong>Valid Until:</strong> {{ coupon.expiration_date|date:"F d, Y" }}</p>
         </div>
@@ -95,6 +114,13 @@
         <p class="tagline">Show this QR code at the store to redeem your offer!</p>
     </div>
 
+    <div class="footer">
+        <p><strong>{{ coupon.campaign.brand.name }}</strong></p>
+        <p>{{ coupon.campaign.brand.address }}</p>
+        <p>📧 {{ coupon.campaign.brand.email }} | 📞 {{ coupon.campaign.brand.phone }}</p>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+
 </html>

@@ -791,20 +791,15 @@ def generate_subscriber_pdfs(request):
 
 
 def redeem_coupon(request, tracking_id):
-    # Get tracking link or return 404
     tracking_link = get_object_or_404(TrackingLink, unique_id=tracking_id)
     
-    # Update clicked status if not already clicked
     if not tracking_link.clicked:
         tracking_link.clicked = True
-        # tracking_link.clicked_at = timezone.now()
         tracking_link.save()
 
-    # Get related objects
     subscriber = tracking_link.subscriber
     coupon = tracking_link.coupon
 
-    # Generate QR code containing the tracking ID
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -814,10 +809,8 @@ def redeem_coupon(request, tracking_id):
     qr.add_data(tracking_id)
     qr.make(fit=True)
 
-    # Create QR code image
     qr_image = qr.make_image(fill_color="black", back_color="white")
     
-    # Convert QR code to base64 for embedding in HTML
     buffer = BytesIO()
     qr_image.save(buffer, format="PNG")
     qr_base64 = base64.b64encode(buffer.getvalue()).decode()
@@ -852,22 +845,21 @@ def send_email_otp(email, otp):
 
 def brand_login(request):
     if request.method == 'POST':
-        brand_id = request.POST.get('brand_id')
+        email = request.POST.get('email')
         try:
-            brand = Brand.objects.get(brand_id=brand_id)
+            brand = Brand.objects.get(email=email)
             otp = generate_otp()
-            cache.set(f'brand_otp_{brand_id}', otp, 300)
+            cache.set(f'brand_otp_{email}', otp, 300)
             
-            if send_email_otp(brand.email, otp):
-                request.session['brand_id'] = brand_id
-                messages.success(request, 'OTP has been sent to your registered email.')
+            if send_email_otp(email, otp):
+                request.session['brand_email'] = email
+                messages.success(request, 'OTP has been sent to your email.', extra_tags='brand_login')
                 return redirect('verify_otp')
-            
             else:
-                messages.error(request, 'Failed to send OTP. Please try again.')
+                messages.error(request, 'Failed to send OTP. Try again.', extra_tags='brand_login')
         except Brand.DoesNotExist:
-            messages.error(request, 'Invalid Brand ID.')
-    
+            messages.error(request, 'Invalid Email.', extra_tags='brand_login')
+
     return render(request, 'brands/brand_login.html')
 
 def verify_otp(request):
@@ -884,12 +876,12 @@ def verify_otp(request):
             brand = get_object_or_404(Brand, brand_id=brand_id)
 
             user, created = User.objects.get_or_create(username=brand_id, defaults={"email": brand.email})
-            login(request, user)  # Log in the user
+            login(request, user)
             
             del request.session['brand_id']
             return redirect(f'/brand/dashboard/{brand_id}')
         else:
-            messages.error(request, 'Invalid OTP. Please try again.')
+            messages.error(request, 'Invalid OTP. Please try again.', extra_tags="brand_login")
     
     return render(request, 'brands/verify_otp.html')
 

@@ -128,7 +128,7 @@ class TrackingLink(models.Model):
     clicked_at = models.DateTimeField(null=True, blank=True)
     redeemed = models.BooleanField(default=False)
     redeemed_at = models.DateTimeField(null=True, blank=True)
-    bill_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # New field
+    bill_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     def __str__(self):
         return f"{self.unique_id} - {self.coupon.coupon_id} - {'Redeemed' if self.redeemed else 'Not Redeemed'}"
