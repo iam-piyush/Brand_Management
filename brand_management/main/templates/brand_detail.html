@@ -306,10 +306,25 @@
         }
 
         function copyToClipboard() {
-            var copyText = document.getElementById("subscriptionLink").innerText;
-            navigator.clipboard.writeText(copyText);
+            var copyTextElement = document.getElementById("subscriptionLink");
+
+            if (!copyTextElement) {
+                alert("Subscription link not found!");
+                return;
+            }
+
+            var textToCopy = copyTextElement.innerText || copyTextElement.textContent;
+
+            var textarea = document.createElement("textarea");
+            textarea.value = textToCopy;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand("copy");
+            document.body.removeChild(textarea);
+
             alert("Subscription link copied to clipboard!");
         }
+
 
         // Campaign Modal Handlers
         $("#createCampaignModal").on("show.bs.modal", function () {

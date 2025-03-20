@@ -112,9 +112,9 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 
-SUBSCRIPTION_LINK = "http://127.0.0.1:8000/subscribe"
+SUBSCRIPTION_LINK = "http://13.60.196.30/subscribe"
 
-REDEEM_LINK = "http://127.0.0.1:8000/redeem"
+REDEEM_LINK = "http://13.60.196.30/redeem"
 
 
 # For Email OTP, add these to settings.py:
@@ -129,3 +129,13 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
 
 
 FACEBOOK_ACCESS_TOKEN = os.getenv("FACEBOOK_ACCESS_TOKEN")
+
+AWS_ACCESS_KEY_ID = 'ASIAQUFLQHMUYRMPVCZD '
+AWS_SECRET_ACCESS_KEY = 'TaR+o2C4UGJuVS9ZIJpfD6mSWvcte5OIuM+LkEDe'
+AWS_STORAGE_BUCKET_NAME = 'brandmanagementdb'
+AWS_S3_SIGNATURE_NAME = 's3v4',
+AWS_S3_REGION_NAME = 'eu-north-1'
+AWS_S3_FILE_OVERWRITE = False
+AWS_DEFAULT_ACL =  None
+AWS_S3_VERIFY = True
+DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'

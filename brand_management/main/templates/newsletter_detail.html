@@ -62,9 +62,48 @@
 
     .campaign-input-item {
         margin-bottom: 15px;
-        padding: 10px;
+        padding: 0 10px;
+        display: flex;
+        align-items: center;
         border: 1px solid #eee;
         border-radius: 5px;
+    }
+
+    .custom-dropdown-wrapper {
+        position: relative;
+        width: 250px;
+    }
+
+    .campaign-search {
+        width: 100%;
+        padding: 10px;
+        border: none;
+        outline: none;
+    }
+
+    .custom-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        width: 100%;
+        max-height: 200px;
+        overflow-y: auto;
+        border: 1px solid #ccc;
+        background: white;
+        display: none;
+        z-index: 1000;
+        border-radius: 5px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .dropdown-item {
+        padding: 8px;
+        cursor: pointer;
+        border-bottom: 1px solid #eee;
+    }
+
+    .dropdown-item:hover {
+        background: #f1f1f1;
     }
 </style>
 
@@ -282,40 +321,89 @@
         return [...new Set(placeholders)];
     }
 
-    function displayCampaignInputs() {
+    async function fetchCampaignIds() {
+        try {
+            const response = await fetch('/get_campaign_ids/');
+            const data = await response.json();
+            return data.campaign_ids;
+        } catch (error) {
+            console.error('Error fetching campaign IDs:', error);
+            return [];
+        }
+    }
+
+    async function displayCampaignInputs() {
         const container = document.getElementById('campaignInputs');
         container.innerHTML = '';
-        campaignIds = Array(detectedPlaceholders.length).fill('');
+        campaignIds = [];
+
+        const campaignList = await fetchCampaignIds();
 
         detectedPlaceholders.forEach((placeholderId, index) => {
             const inputGroup = document.createElement('div');
             inputGroup.className = 'campaign-input-item';
-            inputGroup.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <label class="form-label mb-0">Campaign ${index + 1}</label>
-                <span class="badge bg-light text-dark">ID: ${placeholderId}</span>
-            </div>
-            <input type="text" class="form-control campaign-id-input" 
-                   data-placeholder="${placeholderId}" 
-                   placeholder="Enter Campaign ID">
-        `;
+
+            const dropdownWrapper = document.createElement('div');
+            dropdownWrapper.className = 'custom-dropdown-wrapper';
+
+            const searchInput = document.createElement('input');
+            searchInput.type = 'text';
+            searchInput.className = 'campaign-search';
+            searchInput.placeholder = 'Search Campaign ID...';
+            searchInput.setAttribute('data-index', index);
+
+            const select = document.createElement('div');
+            select.className = 'custom-dropdown';
+
+            function populateDropdown(filter = '') {
+                select.innerHTML = '';
+                let filteredCampaigns = campaignList.filter(id => id.includes(filter.toUpperCase())).slice(0, 15);
+
+                filteredCampaigns.forEach(campaignId => {
+                    const option = document.createElement('div');
+                    option.className = 'dropdown-item';
+                    option.textContent = campaignId;
+                    option.addEventListener('click', () => {
+                        searchInput.value = campaignId;
+                        campaignIds[index] = campaignId;
+                        select.style.display = 'none';
+                        updatePlaceholderCounter();
+                        updatePreviewButton();
+                        checkAndTriggerPreview();
+                    });
+                    select.appendChild(option);
+                });
+            }
+
+            populateDropdown();
+
+            searchInput.addEventListener('focus', () => {
+                select.style.display = 'block';
+            });
+
+            document.addEventListener('click', (event) => {
+                if (!dropdownWrapper.contains(event.target)) {
+                    select.style.display = 'none';
+                }
+            });
+
+            searchInput.addEventListener('input', (event) => {
+                populateDropdown(event.target.value);
+            });
+
+            dropdownWrapper.appendChild(searchInput);
+            dropdownWrapper.appendChild(select);
+            inputGroup.innerHTML = `<label>Campaign ${index + 1} ID:</label>`;
+            inputGroup.appendChild(dropdownWrapper);
             container.appendChild(inputGroup);
+
+            campaignIds.push('');
         });
 
         document.getElementById('campaignInputsSection').style.display = 'block';
         document.getElementById('previewSection').style.display = 'block';
-        updatePlaceholderCounter();
-        updateTotalCampaigns();
-
-        document.querySelectorAll('.campaign-id-input').forEach(input => {
-            input.addEventListener('input', function () {
-                const index = [...document.querySelectorAll('.campaign-id-input')].indexOf(this);
-                campaignIds[index] = this.value.trim();
-                updatePlaceholderCounter();
-                checkAndTriggerPreview();
-            });
-        });
     }
+
 
     function updateTotalCampaigns() {
         const total = document.getElementById('totalCampaigns');

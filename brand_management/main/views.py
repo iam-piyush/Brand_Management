@@ -368,6 +368,11 @@ def get_newsletters(request):
     newsletters = Newsletter.objects.all()
     return render(request, "newsletters.html", {"newsletters": newsletters, "brands": brands})
 
+
+def get_campaign_ids(request):
+    campaign_ids = list(Campaign.objects.values_list('campaign_id', flat=True))
+    return JsonResponse({"campaign_ids": campaign_ids})
+
 @user_passes_test(is_admin)
 def newsletter_detail(request, newsletter_id):
     newsletter = get_object_or_404(Newsletter, newsletter_id=newsletter_id)

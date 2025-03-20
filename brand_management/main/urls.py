@@ -21,6 +21,7 @@ urlpatterns = [
 
     # Newsletter-related URLs
     path('newsletters/', views.newsletter_list, name='newsletter_list'),
+    path('get_campaign_ids/', views.get_campaign_ids, name='get_campaign_ids'),
     path('api/create-newsletter/', views.create_newsletter, name='create_newsletter'),
     path('newsletter/<str:newsletter_id>/', views.newsletter_detail, name='newsletter_detail'),
     path('api/generate-subscriber-pdfs/', views.generate_subscriber_pdfs, name='generate-subscriber-pdfs'),
