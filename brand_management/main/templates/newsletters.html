@@ -59,7 +59,8 @@
                 <button id="filterBtn" class="btn btn-primary">Filter</button>
             </div>
             <div class="d-flex align-items-center">
-                <button class="btn-create" data-bs-toggle="modal" data-bs-target="#createNewsletterModal">Create Newsletter</button>
+                <button class="btn-create" data-bs-toggle="modal" data-bs-target="#createNewsletterModal">Create
+                    Newsletter</button>
                 <span id="newsletterCount" class="badge">{{ newsletters|length|default:0 }} Newsletters</span>
             </div>
         </div>
@@ -71,7 +72,7 @@
                     <th>S.No.</th>
                     <th>Newsletter Name</th>
                     <th>Newsletter ID</th>
-                    <th>Created Date</th>
+                    <th>Created At</th>
                     <th>Campaign IDs</th>
                     <th>Action</th>
                 </tr>
@@ -99,7 +100,8 @@
 </div>
 
 <!-- Simplified Create Newsletter Modal -->
-<div class="modal fade" id="createNewsletterModal" tabindex="-1" aria-labelledby="createNewsletterModalLabel" aria-hidden="true">
+<div class="modal fade" id="createNewsletterModal" tabindex="-1" aria-labelledby="createNewsletterModalLabel"
+    aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content rounded-0">
             <div class="modal-header">

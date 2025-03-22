@@ -16,6 +16,7 @@ urlpatterns = [
 
     # Campaign-related URLs
     path("campaigns/", views.campaigns, name="campaigns"),
+    path("campaigns/<str:campaign_id>/", views.campaign_detail, name="campaign_detail"),
     path("create_campaign/<str:brand_id>/", views.create_campaign, name="create_campaign"),
     path("get_campaigns/", views.get_campaigns, name="get_campaigns"),
 

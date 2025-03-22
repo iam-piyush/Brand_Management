@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 import pdfkit
+from django.core.serializers.json import DjangoJSONEncoder
 from django.core.mail import EmailMessage
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.timezone import localtime
@@ -320,6 +321,35 @@ def campaigns(request):
         return JsonResponse(campaigns_list, safe=False)
 
     return render(request, "campaigns.html", {"campaigns": campaigns_list})
+
+
+def campaign_detail(request, campaign_id):
+    campaign = get_object_or_404(Campaign, campaign_id=campaign_id)
+
+    newsletter = Newsletter.objects.filter(placeholders__contains=campaign_id).first()
+    coupon = Coupon.objects.filter(campaign=campaign).first()
+    
+    redemptions = TrackingLink.objects.filter(coupon__campaign=campaign, redeemed=True).select_related('coupon', 'subscriber')
+
+    redemptions_by_date = {}
+    for redemption in redemptions:
+        date_str = localtime(redemption.redeemed_at).strftime("%Y-%m-%d")
+        redemptions_by_date[date_str] = redemptions_by_date.get(date_str, 0) + 1
+
+    redemptions_data = {
+        "labels": list(redemptions_by_date.keys()),
+        "data": list(redemptions_by_date.values()),
+    }
+
+    context = {
+        "campaign": campaign,
+        "newsletter": newsletter,
+        "coupon": coupon,
+        "redemptions": redemptions,
+        "redemptions_data": json.dumps(redemptions_data, cls=DjangoJSONEncoder),
+    }
+    
+    return render(request, "campaign_detail.html", context)
     
 
 @user_passes_test(is_admin)
@@ -852,33 +882,39 @@ def brand_login(request):
             cache.set(f'brand_otp_{email}', otp, 300)
             
             if send_email_otp(email, otp):
-                request.session['brand_email'] = email
+                request.session['brand_email'] = email 
+                request.session['brand_id'] = brand.brand_id
                 messages.success(request, 'OTP has been sent to your email.', extra_tags='brand_login')
-                return redirect('verify_otp')
+                return render(request, 'brands/verify_otp.html')
             else:
                 messages.error(request, 'Failed to send OTP. Try again.', extra_tags='brand_login')
         except Brand.DoesNotExist:
-            messages.error(request, 'Invalid Email.', extra_tags='brand_login')
+            messages.error(request, 'No brand associated with this email.', extra_tags='brand_login')
 
     return render(request, 'brands/brand_login.html')
 
 def verify_otp(request):
     brand_id = request.session.get('brand_id')
-    if not brand_id:
+    brand_email = request.session.get('brand_email')
+
+    if not brand_id or not brand_email:
         return redirect('brand_login')
     
     if request.method == 'POST':
         entered_otp = request.POST.get('otp')
-        stored_otp = cache.get(f'brand_otp_{brand_id}')
-        
+        stored_otp = cache.get(f'brand_otp_{brand_email}')
+
         if stored_otp and entered_otp == stored_otp:
-            cache.delete(f'brand_otp_{brand_id}')
+            cache.delete(f'brand_otp_{brand_email}')
+            
             brand = get_object_or_404(Brand, brand_id=brand_id)
 
             user, created = User.objects.get_or_create(username=brand_id, defaults={"email": brand.email})
             login(request, user)
-            
+
             del request.session['brand_id']
+            del request.session['brand_email']
+
             return redirect(f'/brand/dashboard/{brand_id}')
         else:
             messages.error(request, 'Invalid OTP. Please try again.', extra_tags="brand_login")

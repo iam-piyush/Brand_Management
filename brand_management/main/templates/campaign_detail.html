@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+
+    .header {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #DEE2E6;
+        text-align: center;
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 30px;
+    }
+
+    .campaign-info {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #DEE2E6;
+        margin-bottom: 20px;
+    }
+</style>
+<div class="container mt-4">
+    <div class="header">{{ campaign.name }}</div>
+
+    <div class="campaign-info p-3 border rounded">
+        <div class="row">
+            <div class="col-md-4">
+                <p><strong>Campaign ID:</strong> {{ campaign.campaign_id }}</p>
+                <p><strong>Created At:</strong> {{ campaign.created_at|date:"F d, Y" }}</p>
+                <p><strong>Brand Name:</strong> {{ campaign.brand.name }}</p>
+            </div>
+
+            <div class="col-md-4">
+                <p><strong>Newsletter ID:</strong> {{ newsletter.newsletter_id }}</p>
+                <p><strong>Created At:</strong> {{ newsletter.created_at|date:"F d, Y" }}</p>
+
+                <p><strong>Subscriber Base:</strong>
+                    {% if newsletter.subscriber_base %}
+                    <span class="badge bg-primary">{{ newsletter.subscriber_base }}</span>
+                    {% endif %}
+                </p>
+            </div>
+
+            <div class="col-md-4">
+                {% if coupon %}
+                <p><strong>Coupon ID:</strong> {{ coupon.coupon_id }}</p>
+                <p><strong>Coupon Type:</strong> {{ coupon.coupon_type }}</p>
+                <p><strong>Created At:</strong> {{ coupon.created_at|date:"F d, Y" }}</p>
+                {% else %}
+                <p>No coupon available for this campaign.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container mt-4">
+        <div class="header">Analytics</div>
+
+        <!-- Redemption Table -->
+        <div class="analytics-container">
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Coupon ID</th>
+                        <th>Subscriber Name</th>
+                        <th>Redemption Date</th>
+                        <th>Bill Amount</th>
+                        <th>Coupon Type</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for redemption in redemptions %}
+                    <tr>
+                        <td>{{ redemption.coupon.coupon_id }}</td>
+                        <td>{{ redemption.subscriber.name }}</td>
+                        <td>{{ redemption.redeemed_at|date:"Y-m-d H:i" }}</td>
+                        <td>{{ redemption.bill_amount }}</td>
+                        <td>{{ redemption.coupon.coupon_type }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center">No redemptions yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Redemption Graph -->
+        <div class="analytics-container">
+            <canvas id="redemptionChart" width="400" height="200"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+    const redemptionsData = JSON.parse('{{ redemptions_data|escapejs }}');
+
+    const ctx = document.getElementById('redemptionChart').getContext('2d');
+    const redemptionChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: redemptionsData.labels,
+            datasets: [{
+                label: 'Redemptions',
+                data: redemptionsData.data,
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1,
+                fill: true
+            }]
+        },
+        options: {
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}

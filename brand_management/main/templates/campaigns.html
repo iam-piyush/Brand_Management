@@ -69,6 +69,7 @@
                 <th>Brand</th>
                 <th>Coupon ID</th>
                 <th>Newsletter ID</th>
+                <th>Action</th>
             </tr>
         </thead>
         <tbody id="campaignTable">
@@ -80,10 +81,15 @@
                 <td>{{ campaign.brand_name }}</td>
                 <td>{{ campaign.coupon_id }}</td>
                 <td>{{ campaign.newsletter_id }}</td>
+                <td>
+                    <a href="{% url 'campaign_detail' campaign.campaign_id %}" class="btn btn-sm btn-outline-primary">
+                        View &nearr;
+                    </a>
+                </td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="6" class="text-center">No campaigns found.</td>
+                <td colspan="7" class="text-center">No campaigns found.</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -113,18 +119,23 @@
                     if (response.length > 0) {
                         response.forEach(campaign => {
                             campaignTable.append(`
-                                <tr>
-                                    <td>${campaign.campaign_id}</td>
-                                    <td>${campaign.name}</td>
-                                    <td>${campaign.created_at}</td>
-                                    <td>${campaign.brand_name}</td>
-                                    <td>${campaign.coupon_id}</td>
-                                    <td>${campaign.newsletter_id}</td>
-                                </tr>
-                            `);
+                <tr>
+                    <td>${campaign.campaign_id}</td>
+                    <td>${campaign.name}</td>
+                    <td>${campaign.created_at}</td>
+                    <td>${campaign.brand_name}</td>
+                    <td>${campaign.coupon_id}</td>
+                    <td>${campaign.newsletter_id}</td>
+                    <td>
+                        <a href="/campaigns/${campaign.campaign_id}/" class="btn btn-sm btn-outline-primary">
+                            View &nearr;
+                        </a>
+                    </td>
+                </tr>
+            `);
                         });
                     } else {
-                        campaignTable.append(`<tr><td colspan="6" class="text-center">No campaigns found.</td></tr>`);
+                        campaignTable.append(`<tr><td colspan="7" class="text-center">No campaigns found.</td></tr>`);
                     }
                 },
                 error: function (error) {
