@@ -155,19 +155,56 @@
                     <span class="badge bg-success">PDF Sent</span>
                     {% elif newsletter.pdf_generated %}
                     <span class="badge bg-danger">PDF Not Sent</span>
-                <form method="POST" action="{% url 'deliver_newsletters' newsletter.newsletter_id %}">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-primary">Deliver Newsletters</button>
-                </form>
-                {% else %}
-                <span class="badge bg-secondary">PDF Not Generated</span>
-                {% endif %}
+                    <button type="button" class="btn btn-warning ms-3" data-bs-toggle="modal"
+                        data-bs-target="#deliveryModal">
+                        Deliver Newsletters
+                    </button>
+
+
+                    {% else %}
+                    <span class="badge bg-secondary">PDF Not Generated</span>
+                    {% endif %}
                 </p>
 
 
             </div>
         </div>
     </div>
+
+
+    <!-- Delivery Channel Modal -->
+    <div class="modal fade" id="deliveryModal" tabindex="-1" aria-labelledby="deliveryModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="{% url 'deliver_newsletters' newsletter.newsletter_id %}">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="deliveryModalLabel">Select Delivery Channels</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="channels" value="email"
+                                id="emailCheck">
+                            <label class="form-check-label" for="emailCheck">Email</label>
+                        </div>
+
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="channels" value="whatsapp"
+                                id="whatsappCheck">
+                            <label class="form-check-label" for="whatsappCheck">WhatsApp</label>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-primary">Confirm Delivery</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
 
 
 

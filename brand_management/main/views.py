@@ -3,6 +3,7 @@ from django.utils.timezone import now
 from django.conf import settings
 from django.core.mail import send_mail
 from django.contrib import messages
+from django.utils import timezone
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 import pdfkit
@@ -31,6 +32,10 @@ from asgiref.sync import sync_to_async
 from django.template import Template, Context
 import tempfile
 import zipfile
+
+
+ACCESS_TOKEN = "EAAIn14GW66QBO6631U88aNEkYPgzjh882e2mXweZBuRd5ZCE6lFVHIkAtLalGTNHTCf3MQ4DWHxvJgnm38KmLKJgL6IOEZAEwH9LsqpLU0vT17fGhJ0lZAWZAe4p60bZC9Qew37s1Fct07dI9hOgZBUixPIulfDThkWI9bqtsAnn5gcLzGvYRZA4U73nmCY2IMt07xxglKnoeOZCZB5soUer3EWHugAogkzlExBu4uPBEN"
+PHONE_NUMBER_ID = "529877620216829"
 
 # Helper function to check if user is admin
 def is_admin(user):
@@ -995,6 +1000,36 @@ def validate_coupon(request, brand_id):
             tracking.redeemed_at = now()
             tracking.save()
 
+            phone_number = subscriber.phone
+            if not phone_number.startswith("91"):
+                phone_number = f"91{phone_number}"
+
+            message = {
+                "messaging_product": "whatsapp",
+                "to": phone_number,
+                "type": "template",
+                "template": {
+                    "name": "redemption_message",
+                    "language": {"code": "en_US"},
+                    "components": [
+                        {
+                            "type": "body",
+                            "parameters": [
+                                {"type": "text", "text": subscriber.name},
+                                {"type": "text", "text": coupon.campaign.brand.name}
+                            ]
+                        }
+                    ]
+                }
+            }
+
+            headers = {
+                "Authorization": f"Bearer {ACCESS_TOKEN}",
+                "Content-Type": "application/json"
+            }
+
+            response = requests.post(PHONE_NUMBER_ID, headers=headers, json=message)
+
             return JsonResponse({
                 "status": "success",
                 "message": f"Coupon successfully redeemed for {subscriber.name}.",
@@ -1035,6 +1070,73 @@ def brand_analytics(request, brand_id):
 
 
 
+def send_whatsapp_message(subscriber, newsletter):
+    pdf_path = os.path.join(
+        settings.MEDIA_ROOT,
+        f'newsletters/{newsletter.newsletter_id}/{subscriber.subscriber_id}_{newsletter.newsletter_id}.pdf'
+    )
+
+    url = f"https://graph.facebook.com/v17.0/{PHONE_NUMBER_ID}/media"
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+    }
+
+    with open(pdf_path, 'rb') as pdf_file:
+        files = {
+            'file': ('document.pdf', pdf_file, 'application/pdf'),
+        }
+        data = {
+            'messaging_product': 'whatsapp',
+            'type': 'document'
+        }
+
+        response = requests.post(url, headers=headers, files=files, data=data)
+
+        if response.status_code == 200:
+            media_id = response.json().get('id')
+        else:
+            return
+
+    url = f"https://graph.facebook.com/v17.0/{PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": subscriber.phone if subscriber.phone.startswith("91") else f"91{subscriber.phone}",
+        "type": "template",
+        "template": {
+            "name": "coupon_newsletter",
+            "language": {"code": "en_US"},
+            "components": [
+                {
+                    "type": "header",
+                    "parameters": [
+                        {
+                            "type": "document",
+                            "document": {
+                                "id": media_id,
+                                "filename": "Dizittal Newslatter.pdf"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "body",
+                    "parameters": [
+                        {
+                            "type": "text",
+                            "text": subscriber.name
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+
+    response = requests.post(url, headers=headers, json=payload)
+
 
 def send_email_with_pdf(subscriber, newsletter):
     pdf_url = f"{settings.MEDIA_URL}newsletters/{newsletter.newsletter_id}/{subscriber.subscriber_id}_{newsletter.newsletter_id}.pdf"
@@ -1066,26 +1168,35 @@ def send_email_with_pdf(subscriber, newsletter):
 
 def deliver_newsletters(request, newsletter_id):
     newsletter = get_object_or_404(Newsletter, newsletter_id=newsletter_id)
-    
+
     if not newsletter.pdf_generated:
         messages.error(request, 'PDFs have not been generated yet.')
         return redirect('newsletter_detail', newsletter_id=newsletter_id)
 
-    subscriber_base = newsletter.subscriber_base
-
+    subscriber_base = newsletter.get_subscriber_base()
     subscribers = Subscriber.objects.filter(group__in=subscriber_base)
 
     if not subscribers.exists():
         messages.error(request, 'No subscribers found for this newsletter.')
         return redirect('newsletter_detail', newsletter_id=newsletter_id)
 
+    selected_channels = request.POST.getlist('channels')
+
+    if not selected_channels:
+        messages.warning(request, 'No delivery channel selected.')
+        return redirect('newsletter_detail', newsletter_id=newsletter_id)
+
     for subscriber in subscribers:
-        send_email_with_pdf(subscriber, newsletter)
+        if 'whatsapp' in selected_channels:
+            send_whatsapp_message(subscriber, newsletter)
+        if 'email' in selected_channels:
+            send_email_with_pdf(subscriber, newsletter)
 
     newsletter.pdf_sent = True
+    newsletter.schedule_delete = timezone.now() + timedelta(minutes=30)
     newsletter.save()
 
-    messages.success(request, f'Newsletter PDFs successfully sent to {subscribers.count()} subscribers.')
+    messages.success(request, f'Newsletter PDFs sent to {subscribers.count()} subscribers via {", ".join(selected_channels).title()}.')
     return redirect('newsletter_detail', newsletter_id=newsletter_id)
 
 

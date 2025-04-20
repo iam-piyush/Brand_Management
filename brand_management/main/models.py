@@ -43,14 +43,13 @@ class Newsletter(models.Model):
     is_frozen = models.BooleanField(default=False)
     pdf_generated = models.BooleanField(default=False)
     pdf_sent = models.BooleanField(default=False)
+    schedule_delete = models.DateTimeField(null=True, blank=True)
     subscriber_base = models.TextField(null=True, blank=True)
 
     def get_placeholders(self):
-        """Returns list of campaign IDs"""
         return self.placeholders.split(',') if self.placeholders else []
 
     def get_subscriber_base(self):
-        """Returns the subscriber groups as a list"""
         return self.subscriber_base.split(',') if self.subscriber_base else []
 
     def is_complete(self):

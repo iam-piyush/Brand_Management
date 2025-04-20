@@ -2,7 +2,6 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(os.path.join(BASE_DIR, ".env"))
@@ -112,9 +111,9 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 
-SUBSCRIPTION_LINK = "http://13.60.196.30/subscribe"
+SUBSCRIPTION_LINK = "https://dizittal.co.in/subscribe"
 
-REDEEM_LINK = "http://13.60.196.30/redeem"
+REDEEM_LINK = "https://dizittal.co.in/redeem"
 
 
 # For Email OTP, add these to settings.py:
